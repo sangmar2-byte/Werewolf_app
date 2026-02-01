@@ -1,19 +1,74 @@
 // app.js
 
+// Vérifie si le stockage local est disponible (important pour Firebase Auth web)
+function storageAvailable() {
+  try {
+    const testKey = "__lg_test__";
+    window.localStorage.setItem(testKey, "1");
+    window.localStorage.removeItem(testKey);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Firebase instances (créées à partir de la config dans index.html)
 const auth = firebase.auth();
 const db = firebase.firestore();
-auth.getRedirectResult()
+
+console.log("[INIT] location:", window.location.href);
+console.log("[INIT] userAgent:", navigator.userAgent);
+console.log("[INIT] storageAvailable:", storageAvailable());
+
+// Gestion du retour Google après signInWithRedirect
+auth
+  .getRedirectResult()
   .then((result) => {
+    console.log("[getRedirectResult] result:", result);
+
     if (result.user) {
-      console.log("Connexion Google OK :", result.user.uid);
-      // rien d'autre ici, on laisse auth.onAuthStateChanged gérer la suite
+      console.log("[getRedirectResult] user connecté:", result.user.uid);
+      // onAuthStateChanged prendra le relais pour la navigation
+      return;
+    }
+
+    // Aucun user après un redirect → cas typique "pas d'event auth"
+    if (!result.user && storageAvailable() === false) {
+      alert(
+        "La connexion Google n'a pas pu être conservée.\n" +
+          "Ton navigateur bloque le stockage (mode privé ou restrictions).\n" +
+          "Utilise la connexion par téléphone pour jouer."
+      );
+    } else {
+      console.log(
+        "[getRedirectResult] Aucun utilisateur trouvé après la redirection."
+      );
     }
   })
   .catch((error) => {
-    console.error("Erreur Google redirect:", error);
-    alert("Erreur Google : " + error.message);
+    console.error("[getRedirectResult] Erreur Google redirect:", error);
+
+    let msg = "Erreur Google : " + error.message;
+
+    if (error.code === "auth/unauthorized-domain") {
+      msg =
+        "Domaine non autorisé pour Google.\n" +
+        "Vérifie dans Firebase Authentication → Paramètres → Domaines autorisés\n" +
+        "que loup-garou-hardcore.netlify.app est bien présent.";
+    } else if (error.code === "auth/operation-not-allowed") {
+      msg =
+        "La connexion Google n'est pas activée sur ce projet Firebase.\n" +
+        "Active le fournisseur Google dans Firebase → Authentication → Méthode de connexion.";
+    } else if (error.code === "auth/no-auth-event") {
+      msg =
+        "Google n'a pas renvoyé d'information de connexion.\n" +
+        "Sur certains navigateurs (mode privé, blocage du stockage), la connexion Google ne fonctionne pas.\n" +
+        "Utilise la connexion par téléphone.";
+    }
+
+    alert(msg);
   });
+
 // État d'authentification (piloté par Firebase)
 let authState = {
   isAuthenticated: false,
@@ -314,6 +369,58 @@ function renderRules() {
   });
 }
 
+/* ==== Helpers d'environnement et Google Sign-in ==== */
+
+function isIOS() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function isStandalonePWA() {
+  const mq =
+    window.matchMedia && window.matchMedia("(display-mode: standalone)");
+  return (mq && mq.matches) || window.navigator.standalone === true;
+}
+
+function isEmbeddedBrowser() {
+  const ua = navigator.userAgent || "";
+  return /FBAN|FBAV|Instagram|Line\/|Twitter/i.test(ua);
+}
+
+function signInWithGoogle() {
+  if (isIOS() && isStandalonePWA()) {
+    alert(
+      "La connexion Google n'est pas supportée en mode 'application' sur iPhone.\n" +
+        "Ouvre le site dans Safari ou utilise la connexion par téléphone."
+    );
+    return;
+  }
+
+  if (isEmbeddedBrowser()) {
+    alert(
+      "La connexion Google ne fonctionne pas dans ce navigateur intégré.\n" +
+        "Ouvre le lien dans le navigateur de ton téléphone (Safari / Chrome)\n" +
+        "ou utilise la connexion par téléphone."
+    );
+    return;
+  }
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    console.log("[Google] signInWithRedirect");
+    auth.signInWithRedirect(provider);
+  } else {
+    console.log("[Google] signInWithPopup");
+    auth
+      .signInWithPopup(provider)
+      .catch((err) => {
+        console.error("Erreur Google popup:", err);
+        alert("Erreur Google : " + err.message);
+      });
+  }
+}
+
 /**
  * Handlers de la page de login (T0.2)
  */
@@ -361,25 +468,10 @@ function setupLoginHandlers() {
     });
   }
 
-// google
-
-function signInWithGoogle() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-
-  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-
-  if (isMobile) {
-    auth.signInWithRedirect(provider);
-  } else {
-    auth.signInWithPopup(provider).catch((err) => {
-      console.error("Erreur Google popup:", err);
-      alert("Erreur Google : " + err.message);
-    });
+  // Google
+  if (btnGoogle) {
+    btnGoogle.addEventListener("click", signInWithGoogle);
   }
-}
-if (btnGoogle) {
-  btnGoogle.addEventListener("click", signInWithGoogle);
-}
 
   // Apple (nécessite config côté Firebase + Apple)
   if (btnApple) {
