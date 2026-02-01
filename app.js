@@ -14,7 +14,6 @@ auth.getRedirectResult()
     console.error("Erreur Google redirect:", error);
     alert("Erreur Google : " + error.message);
   });
-  
 // État d'authentification (piloté par Firebase)
 let authState = {
   isAuthenticated: false,
