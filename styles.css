@@ -1,0 +1,294 @@
+/* Reset minimal */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #020617;
+  --bg-card: #0f172a;
+  --accent: #fbbf24;
+  --accent-soft: rgba(251, 191, 36, 0.1);
+  --text-main: #f9fafb;
+  --text-muted: #9ca3af;
+  --border-subtle: #1f2937;
+  --danger: #ef4444;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.6);
+}
+
+html,
+body {
+  height: 100%;
+  background: radial-gradient(circle at top, #111827 0%, #020617 55%, #000000 100%);
+  color: var(--text-main);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Roboto", sans-serif;
+}
+
+/* Layout général */
+#app {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  padding: 16px;
+}
+
+/* Container principal */
+.shell {
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+}
+
+/* Card principale (landing / login) */
+.card {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.92));
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: var(--shadow-soft);
+  padding: 20px 18px 18px;
+}
+
+/* Header jeu */
+.game-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.game-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: radial-gradient(circle, var(--accent) 0%, #f97316 50%, #991b1b 100%);
+}
+
+.game-title {
+  margin-top: 12px;
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.game-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Image/visuel placeholder */
+.hero-visual {
+  position: relative;
+  margin-top: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  overflow: hidden;
+  background: radial-gradient(circle at top, rgba(148, 163, 184, 0.15), transparent 55%);
+  padding: 10px 10px 12px;
+}
+
+.hero-tagline {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hero-meta {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.hero-meta strong {
+  color: var(--accent);
+}
+
+/* Sections */
+.section {
+  margin-top: 16px;
+}
+
+.section-title {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.section-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.section-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.section-bullet {
+  margin-top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+}
+
+/* Bloc confidentialité / message important */
+.notice-card {
+  margin-top: 14px;
+  padding: 10px 10px 9px;
+  border-radius: var(--radius-lg);
+  background: radial-gradient(circle at left, rgba(239, 68, 68, 0.18), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.notice-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fecaca;
+  margin-bottom: 4px;
+}
+
+.notice-text {
+  font-size: 11px;
+  color: #fee2e2;
+}
+
+/* CTA bloc */
+.cta-block {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  width: 100%;
+  border-radius: 999px;
+  padding: 11px 16px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  color: #111827;
+  box-shadow: 0 10px 30px rgba(248, 181, 55, 0.45);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 15px rgba(248, 181, 55, 0.3);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  color: var(--text-main);
+}
+
+.btn-sm {
+  padding-block: 8px;
+  font-size: 12px;
+}
+
+.cta-subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Footer mini */
+.footer {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Login view simple (placeholder) */
+.login-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.login-description {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.input {
+  padding: 9px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Responsive très basique */
+@media (min-width: 600px) {
+  #app {
+    padding: 24px;
+  }
+
+  .card {
+    padding: 22px 20px 18px;
+  }
+
+  .game-title {
+    font-size: 28px;
+  }
+}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Loup-garou IRL – Hardcore</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Manifest PWA -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Couleurs navigateur mobile -->
+  <meta name="theme-color" content="#111827" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Firebase SDK (version compat, plus simple pour l’instant) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Configuration Firebase -->
+  <script>
+    // Config récupérée dans la console Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyAHUm9jdI_TCBel0BxLcWDidJYFp4Ywvk8",
+      authDomain: "lg-hardcore.firebaseapp.com",
+      projectId: "lg-hardcore",
+      storageBucket: "lg-hardcore.firebasestorage.app",
+      messagingSenderId: "22777567547",
+      appId: "1:22777567547:web:365a7f736e8f8677517f1e",
+      measurementId: "G-61Q7ZCNJ8G"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  </script>
+
+  <!-- Script principal -->
+  <!-- Scripts principaux -->
+  <script src="app.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
