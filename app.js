@@ -3,7 +3,17 @@
 // Firebase instances (créées à partir de la config dans index.html)
 const auth = firebase.auth();
 const db = firebase.firestore();
-
+auth.getRedirectResult()
+  .then((result) => {
+    if (result.user) {
+      console.log("Connexion Google OK :", result.user.uid);
+      // rien d'autre ici, on laisse auth.onAuthStateChanged gérer la suite
+    }
+  })
+  .catch((error) => {
+    console.error("Erreur Google redirect:", error);
+    alert("Erreur Google : " + error.message);
+  });
 // État d'authentification (piloté par Firebase)
 let authState = {
   isAuthenticated: false,
@@ -351,18 +361,25 @@ function setupLoginHandlers() {
     });
   }
 
-  // Google
-  if (btnGoogle) {
-    btnGoogle.addEventListener("click", async () => {
-      try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        await auth.signInWithPopup(provider);
-      } catch (err) {
-        console.error(err);
-        alert("Erreur Google : " + err.message);
-      }
+// google
+
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+
+  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    auth.signInWithRedirect(provider);
+  } else {
+    auth.signInWithPopup(provider).catch((err) => {
+      console.error("Erreur Google popup:", err);
+      alert("Erreur Google : " + err.message);
     });
   }
+}
+if (btnGoogle) {
+  btnGoogle.addEventListener("click", signInWithGoogle);
+}
 
   // Apple (nécessite config côté Firebase + Apple)
   if (btnApple) {
