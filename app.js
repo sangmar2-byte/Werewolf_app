@@ -511,6 +511,8 @@ auth.onAuthStateChanged(async (user) => {
   authState.uid = user ? user.uid : null;
 
   const hash = window.location.hash || "#/";
+  
+console.log("[onAuthStateChanged] user:", !!user, user && user.uid);
 
   // Utilisateur déconnecté
   if (!authState.isAuthenticated) {
