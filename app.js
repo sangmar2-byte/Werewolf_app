@@ -472,7 +472,7 @@ function setupLoginHandlers() {
 
       alert(
         "Un lien de connexion t'a été envoyé.\n" +
-          "Clique dessus depuis ta boîte mail pour te connecter au village."
+          "Clique dessus depuis ta boîte mail pour te connecter au village. Regarde dans tes spams."
       );
     } catch (err) {
       console.error("[magic-link] erreur:", err);
