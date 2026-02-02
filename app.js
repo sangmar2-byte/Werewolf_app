@@ -20,6 +20,42 @@ console.log("[INIT] location:", window.location.href);
 console.log("[INIT] userAgent:", navigator.userAgent);
 console.log("[INIT] storageAvailable:", storageAvailable());
 
+/* ==== Paramètres et helpers pour le lien magique email ==== */
+
+// IMPORTANT : mets bien ton domaine Netlify ici
+const ACTION_CODE_SETTINGS = {
+  url: "https://loup-garou-hardcore.netlify.app/#/login",
+  handleCodeInApp: true,
+};
+
+function rememberMagicLinkEmail(email) {
+  if (!storageAvailable()) return;
+  try {
+    window.localStorage.setItem("lg_magic_email", email);
+  } catch (e) {
+    console.warn("[magic-link] impossible de stocker l'email :", e);
+  }
+}
+
+function getRememberedMagicLinkEmail() {
+  if (!storageAvailable()) return null;
+  try {
+    return window.localStorage.getItem("lg_magic_email");
+  } catch (e) {
+    console.warn("[magic-link] impossible de lire l'email :", e);
+    return null;
+  }
+}
+
+function clearRememberedMagicLinkEmail() {
+  if (!storageAvailable()) return;
+  try {
+    window.localStorage.removeItem("lg_magic_email");
+  } catch (e) {
+    console.warn("[magic-link] impossible d'effacer l'email :", e);
+  }
+}
+
 // Gestion du retour Google après signInWithRedirect
 auth
   .getRedirectResult()
@@ -37,7 +73,7 @@ auth
       alert(
         "La connexion Google n'a pas pu être conservée.\n" +
           "Ton navigateur bloque le stockage (mode privé ou restrictions).\n" +
-          "Utilise la connexion par téléphone pour jouer."
+          "Utilise la connexion par e-mail pour jouer."
       );
     } else {
       console.log(
@@ -63,7 +99,7 @@ auth
       msg =
         "Google n'a pas renvoyé d'information de connexion.\n" +
         "Sur certains navigateurs (mode privé, blocage du stockage), la connexion Google ne fonctionne pas.\n" +
-        "Utilise la connexion par téléphone.";
+        "Utilise plutôt la connexion par e-mail.";
     }
 
     alert(msg);
@@ -225,7 +261,7 @@ function renderLanding() {
             Voir les règles complètes &amp; confidentialité
           </button>
           <p class="cta-subtext">
-            L’accès au jeu nécessite une connexion (Téléphone, Google ou Apple).
+            L’accès au jeu nécessite une connexion (e-mail ou Google).
           </p>
         </div>
 
@@ -246,7 +282,7 @@ function renderLanding() {
 }
 
 /**
- * Render: Page de login (T0.2 – UI + logique Auth)
+ * Render: Page de login (email magique + Google)
  */
 function renderLogin() {
   const app = document.getElementById("app");
@@ -265,37 +301,27 @@ function renderLogin() {
         </p>
 
         <form class="form" id="login-form" onsubmit="return false;">
+          <!-- Connexion par e-mail (lien magique) -->
           <div class="field">
-            <label class="label" for="phone">Téléphone (OTP SMS)</label>
+            <label class="label" for="email">Adresse e-mail</label>
             <input
-              id="phone"
-              name="phone"
-              type="tel"
+              id="email"
+              name="email"
+              type="email"
               class="input"
-              placeholder="+33 6 12 34 56 78"
+              placeholder="ex : joueur@exemple.com"
+              autocomplete="email"
             />
           </div>
 
-          <div id="recaptcha-container"></div>
-
-          <button type="button" class="btn btn-primary" id="btn-phone-login">
-            Recevoir un code OTP
+          <button type="button" class="btn btn-primary" id="btn-email-link">
+            Recevoir un lien par e-mail
           </button>
 
           <div class="field">
             <span class="label">Ou continue avec</span>
             <button type="button" class="btn btn-outline" id="btn-google">
               Google
-            </button>
-            <button type="button" class="btn btn-outline" id="btn-apple">
-              Apple
-            </button>
-          </div>
-
-          <div class="field">
-            <span class="label">Déjà connecté sur ce device ?</span>
-            <button type="button" class="btn btn-outline btn-sm" id="btn-go-app">
-              Aller à l’application
             </button>
           </div>
         </form>
@@ -390,7 +416,7 @@ function signInWithGoogle() {
   if (isIOS() && isStandalonePWA()) {
     alert(
       "La connexion Google n'est pas supportée en mode 'application' sur iPhone.\n" +
-        "Ouvre le site dans Safari ou utilise la connexion par téléphone."
+        "Ouvre le site dans Safari ou utilise la connexion par e-mail."
     );
     return;
   }
@@ -399,7 +425,7 @@ function signInWithGoogle() {
     alert(
       "La connexion Google ne fonctionne pas dans ce navigateur intégré.\n" +
         "Ouvre le lien dans le navigateur de ton téléphone (Safari / Chrome)\n" +
-        "ou utilise la connexion par téléphone."
+        "ou utilise la connexion par e-mail."
     );
     return;
   }
@@ -409,7 +435,10 @@ function signInWithGoogle() {
 
   if (isMobile) {
     console.log("[Google] signInWithRedirect");
-    auth.signInWithRedirect(provider);
+    auth.signInWithRedirect(provider).catch((err) => {
+      console.error("Erreur Google redirect:", err);
+      alert("Erreur Google : " + err.message);
+    });
   } else {
     console.log("[Google] signInWithPopup");
     auth
@@ -422,84 +451,74 @@ function signInWithGoogle() {
 }
 
 /**
- * Handlers de la page de login (T0.2)
+ * Handlers de la page de login (email + Google)
  */
 function setupLoginHandlers() {
-  const phoneInput = document.getElementById("phone");
-  const btnPhone = document.getElementById("btn-phone-login");
+  const emailInput = document.getElementById("email");
+  const btnEmailLink = document.getElementById("btn-email-link");
   const btnGoogle = document.getElementById("btn-google");
-  const btnApple = document.getElementById("btn-apple");
-  const btnGoApp = document.getElementById("btn-go-app");
 
-  // Phone + OTP
-  if (btnPhone) {
-    btnPhone.addEventListener("click", async () => {
-      const phoneNumber = (phoneInput?.value || "").trim();
-      if (!phoneNumber) {
-        alert("Merci de saisir un numéro de téléphone.");
-        return;
-      }
+  // Envoi du lien magique
+  async function sendMagicLink() {
+    const email = (emailInput?.value || "").trim();
+    if (!email) {
+      alert("Merci de saisir ton adresse e-mail.");
+      return;
+    }
 
-      try {
-        if (!window.recaptchaVerifier) {
-          window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier(
-            "recaptcha-container",
-            { size: "invisible" }
-          );
-        }
+    try {
+      rememberMagicLinkEmail(email);
+      await auth.sendSignInLinkToEmail(email, ACTION_CODE_SETTINGS);
 
-        const appVerifier = window.recaptchaVerifier;
-        const confirmationResult = await auth.signInWithPhoneNumber(
-          phoneNumber,
-          appVerifier
-        );
-
-        const code = window.prompt("Entre le code OTP reçu par SMS :");
-        if (!code) {
-          alert("Code OTP manquant.");
-          return;
-        }
-
-        await confirmationResult.confirm(code);
-      } catch (err) {
-        console.error(err);
-        alert("Erreur OTP : " + err.message);
-      }
-    });
+      alert(
+        "Un lien de connexion t'a été envoyé.\n" +
+          "Clique dessus depuis ta boîte mail pour te connecter au village."
+      );
+    } catch (err) {
+      console.error("[magic-link] erreur:", err);
+      alert("Erreur lors de l'envoi du lien : " + err.message);
+    }
   }
 
-  // Google
+  if (btnEmailLink) {
+    btnEmailLink.addEventListener("click", sendMagicLink);
+  }
+
   if (btnGoogle) {
     btnGoogle.addEventListener("click", signInWithGoogle);
   }
+}
 
-  // Apple (nécessite config côté Firebase + Apple)
-  if (btnApple) {
-    btnApple.addEventListener("click", async () => {
-      try {
-        const provider = new firebase.auth.OAuthProvider("apple.com");
-        provider.addScope("email");
-        provider.addScope("name");
-        await auth.signInWithPopup(provider);
-      } catch (err) {
-        console.error(err);
-        alert(
-          "Erreur Apple : " +
-            err.message +
-            "\nVérifie la configuration Apple dans Firebase."
-        );
-      }
-    });
-  }
+/**
+ * Traite un éventuel lien magique email à l'arrivée sur la page
+ */
+async function handleEmailLinkSignInIfNeeded() {
+  try {
+    if (!firebase.auth().isSignInWithEmailLink(window.location.href)) {
+      return; // pas un lien magique
+    }
 
-  if (btnGoApp) {
-    btnGoApp.addEventListener("click", () => {
-      if (!authState.isAuthenticated) {
-        alert("Tu n’es pas connecté sur ce device.");
+    let email = getRememberedMagicLinkEmail();
+    if (!email) {
+      email = window.prompt(
+        "Entre l'adresse e-mail que tu as utilisée pour recevoir ce lien :"
+      );
+      if (!email) {
+        alert("Connexion annulée : e-mail manquant.");
         return;
       }
-      navigateTo("#/app/home");
-    });
+    }
+
+    const result = await auth.signInWithEmailLink(email, window.location.href);
+    console.log("[magic-link] connexion OK:", result.user.uid);
+    clearRememberedMagicLinkEmail();
+
+    // Nettoyage de l'URL (on reste sur #/login, onAuthStateChanged redirigera)
+    const base = window.location.origin + window.location.pathname + "#/login";
+    window.history.replaceState(null, "", base);
+  } catch (err) {
+    console.error("[magic-link] erreur de connexion:", err);
+    alert("Erreur lors de la connexion avec le lien : " + err.message);
   }
 }
 
@@ -511,8 +530,8 @@ auth.onAuthStateChanged(async (user) => {
   authState.uid = user ? user.uid : null;
 
   const hash = window.location.hash || "#/";
-  
-console.log("[onAuthStateChanged] user:", !!user, user && user.uid);
+
+  console.log("[onAuthStateChanged] user:", !!user, user && user.uid);
 
   // Utilisateur déconnecté
   if (!authState.isAuthenticated) {
@@ -578,7 +597,7 @@ console.log("[onAuthStateChanged] user:", !!user, user && user.uid);
 
 // Initialisation générale
 window.addEventListener("hashchange", router);
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
   // Service worker désactivé pendant le développement pour éviter les problèmes de cache.
   // if ("serviceWorker" in navigator) {
   //   navigator.serviceWorker
@@ -587,6 +606,9 @@ window.addEventListener("load", () => {
   //       console.warn("Service worker registration failed:", err);
   //     });
   // }
+
+  // Si on arrive via un lien magique email, on le traite avant de router
+  await handleEmailLinkSignInIfNeeded();
 
   router();
 });
