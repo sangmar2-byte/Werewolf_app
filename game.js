@@ -1141,9 +1141,14 @@ function renderGameLobbyView(gameId, game, isMj, isCurrentPlayer, joinCode) {
               ? `
                 ${
                   game.status === "draft"
-                    ? `<button class="btn btn-primary btn-sm" id="btn-start-game">
-                         Lancer la partie
-                       </button>`
+                    ? `
+                      <button class="btn btn-outline btn-sm" id="btn-add-bot">
+                        ➕ Ajouter un joueur fictif
+                      </button>
+                      <button class="btn btn-primary btn-sm" id="btn-start-game">
+                        Lancer la partie
+                      </button>
+                    `
                     : ""
                 }
                 <button class="btn btn-outline btn-sm" id="btn-delete-game">
@@ -1161,7 +1166,7 @@ function renderGameLobbyView(gameId, game, isMj, isCurrentPlayer, joinCode) {
     </div>
   `;
 
-  // Paramètres
+  // Paramètres (panneau latéral)
   const panel = document.getElementById("settings-panel");
   const backdrop = document.getElementById("settings-backdrop");
 
@@ -1234,6 +1239,18 @@ function renderGameLobbyView(gameId, game, isMj, isCurrentPlayer, joinCode) {
         alert("Erreur lors de la mise à jour du message : " + err.message);
       }
     });
+
+    // Ajouter un joueur fictif
+    const btnAddBot = document.getElementById("btn-add-bot");
+    if (btnAddBot) {
+      btnAddBot.addEventListener("click", async () => {
+        const name = window.prompt("Nom du joueur fictif :");
+        if (!name) return;
+        await addBotPlayer(gameId, name.trim());
+        // on recharge la liste
+        loadLobbyPlayers(gameId, true);
+      });
+    }
 
     // Lancer la partie (si draft)
     if (game.status === "draft" && document.getElementById("btn-start-game")) {
@@ -1488,6 +1505,34 @@ function shareGameInvite(code) {
     alert(
       "Le partage natif n’est pas disponible sur ce navigateur.\nL’ID a été copié, colle-le dans WhatsApp / Snap / etc."
     );
+  }
+}
+
+async function addBotPlayer(gameId, name) {
+  if (!name) return;
+
+  const botId = "bot_" + crypto.randomUUID();
+
+  try {
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+
+    await db
+      .collection("games")
+      .doc(gameId)
+      .collection("players")
+      .doc(botId)
+      .set({
+        uid: botId,
+        display_name: name,
+        role_pref: "all",
+        is_bot: true,
+        joined_at: now,
+        updated_at: now,
+      });
+
+  } catch (err) {
+    console.error(err);
+    alert("Erreur lors de l'ajout du joueur fictif : " + err.message);
   }
 }
 
