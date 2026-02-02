@@ -579,20 +579,7 @@ function loadRunningPlayers(gameId) {
                       radial-gradient(circle at 80% 80%, rgba(15,23,42,0.9), transparent 60%);
           pointer-events:none;
         "
-      ></div>
-
-      <!-- Icône joueur / bot -->
-      <div
-        style="
-          position:absolute;
-          top:4px;
-          left:4px;
-          font-size:14px;
-          z-index:2;
-        "
       >
-        ${icon}
-      </div>
 
       <!-- Badge mort uniquement -->
       ${
