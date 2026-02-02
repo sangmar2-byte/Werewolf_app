@@ -19,24 +19,37 @@ function unsubscribeRunningPlayers() {
  */
 function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
   const app = document.getElementById("app");
-  if (!app) return;
 
-  // On coupe un éventuel ancien abonnement de la vue "running"
-  unsubscribeRunningPlayers();
-
-  const phase = game.phase || "night"; // "night" | "day"
+  const phase = game.phase || "night";
   const dayIndex = game.day_index || 1;
-
-  const phaseLabel =
-    phase === "night" ? `Nuit ${dayIndex}` : `Jour ${dayIndex}`;
-  const subtitle =
-    phase === "night"
-      ? "Les actions de nuit seront gérées dans une prochaine itération."
-      : "Les votes et résolutions du jour seront branchés plus tard.";
+  const phaseLabel = phase === "night" ? `Nuit ${dayIndex}` : `Jour ${dayIndex}`;
 
   app.innerHTML = `
-    <div class="shell" style="max-width:100%; padding:8px 4px;">
-      <div class="card" style="width:100%; max-width:100%; margin:0 auto;">
+    <div
+      class="shell"
+      style="
+        height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 16px 12px;
+        box-sizing: border-box;
+        overflow: hidden;
+      "
+    >
+      <div
+        class="card"
+        style="
+          position: relative;
+          width: 100%;
+          max-width: 480px;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          padding-bottom: 16px;
+        "
+      >
         <div class="game-badge">
           <span class="game-badge-dot"></span>
           <span>Partie en cours</span>
@@ -85,7 +98,14 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
             gap:12px;
           "
         >
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              align-items:center;
+              margin-bottom:8px;
+            "
+          >
             <span style="font-weight:600;font-size:15px;">Paramètres</span>
             <button
               id="btn-settings-close"
@@ -101,42 +121,40 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
             </button>
           </div>
 
+          <div
+            style="
+              font-size:12px;
+              color:var(--text-muted);
+              word-break:break-all;
+              padding:6px 8px;
+              border-radius:10px;
+              background:rgba(15,23,42,0.7);
+            "
+          >
+            ID de la partie :
+            <code style="font-size:11px;">${joinCode}</code>
+          </div>
+
           <button
-            id="btn-settings-logout"
+            id="btn-settings-leave"
             type="button"
             class="btn btn-outline btn-sm"
             style="width:100%;"
           >
-            Se déconnecter
+            ${isMj ? "Supprimer la partie" : "Quitter la partie"}
           </button>
 
-          ${
-            isMj
-              ? `
-                <button
-                  id="btn-settings-delete-game"
-                  type="button"
-                  class="btn btn-outline btn-sm"
-                  style="width:100%;border-color:#f97373;color:#fecaca;"
-                >
-                  Supprimer la partie
-                </button>
-              `
-              : isCurrentPlayer
-              ? `
-                <button
-                  id="btn-settings-leave-game"
-                  type="button"
-                  class="btn btn-outline btn-sm"
-                  style="width:100%;border-color:#f97373;color:#fecaca;"
-                >
-                  Quitter la partie
-                </button>
-              `
-              : ""
-          }
+          <button
+            id="btn-settings-logout"
+            type="button"
+            class="btn btn-outline btn-sm"
+            style="width:100%;margin-top:4px;"
+          >
+            Se déconnecter
+          </button>
         </div>
 
+        <!-- Overlay pour fermer le panneau -->
         <div
           id="settings-backdrop"
           style="
@@ -150,188 +168,145 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
           "
         ></div>
 
-        <!-- HEADER PHASE / INFO -->
-        <section class="section" style="margin-top:16px;text-align:center;">
-          <h1 class="login-title">${phaseLabel}</h1>
-          <p class="login-description">
-            ${subtitle}
-          </p>
-
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-            ID de la partie :
-            <code style="font-size:11px;">${joinCode}</code>
-          </p>
-
-          ${
-            isMj
-              ? `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-                   Vue MJ – tu vois tous les joueurs, et tu contrôleras plus tard phases et résolutions.
-                 </p>`
-              : `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-                   Vue joueur – ton rôle, tes actions et ton historique seront affichés ici plus tard.
-                 </p>`
-          }
-        </section>
-
-        <!-- INTERFACE PRINCIPALE : VILLAGE / PROFIL -->
-        <section class="section" style="margin-top:8px;">
-          <!-- Onglets top ? Non : navigation en bas, mais on garde un container ici -->
-          <div id="view-village" style="display:block;">
-            <!-- Top bar : Vote / Action -->
-            <div
-              class="village-topbar"
-              style="
-                display:flex;
-                justify-content:space-between;
-                align-items:center;
-                gap:8px;
-                margin-bottom:8px;
-              "
-            >
-              <button
-                id="btn-vote"
-                class="btn btn-outline btn-sm"
-                type="button"
-                style="flex:1;"
-              >
-                Vote
-              </button>
-              <button
-                id="btn-action"
-                class="btn btn-outline btn-sm"
-                type="button"
-                style="flex:1;"
-              >
-                Action
-              </button>
-            </div>
-
-            <!-- Grille des joueurs (vivants / morts) -->
-            <div
-              class="players-section"
-              style="display:flex;flex-direction:column;gap:10px;"
-            >
-              <div>
-                <div
-                  style="
-                    display:flex;
-                    justify-content:space-between;
-                    align-items:center;
-                    margin-bottom:4px;
-                  "
-                >
-                  <h2 class="section-title" style="margin-bottom:0;">Vivants</h2>
-                </div>
-                <div
-                  id="village-grid-alive"
-                  class="village-grid"
-                  style="
-                    display:grid;
-                    grid-template-columns:repeat(5, minmax(0,1fr));
-                    gap:4px;
-                  "
-                >
-                  <!-- cartes vivants -->
-                </div>
-              </div>
-
-              <hr style="border:none;border-top:1px solid rgba(148,163,184,0.4);margin:4px 0;" />
-
-              <div>
-                <div
-                  style="
-                    display:flex;
-                    justify-content:space-between;
-                    align-items:center;
-                    margin-bottom:4px;
-                  "
-                >
-                  <h2 class="section-title" style="margin-bottom:0;">Morts</h2>
-                </div>
-                <div
-                  id="village-grid-dead"
-                  class="village-grid"
-                  style="
-                    display:grid;
-                    grid-template-columns:repeat(5, minmax(0,1fr));
-                    gap:4px;
-                  "
-                >
-                  <!-- cartes morts -->
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Vue Profil -->
-          <div id="view-profile" style="display:none; margin-top:4px;">
-            <h2 class="section-title">Profil</h2>
-            <div class="notice-card" id="profile-box">
-              <div class="notice-title">Tes informations</div>
-              <p class="notice-text" id="profile-text">
-                Chargement de ton profil joueur...
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- BOTTOM NAVIGATION -->
-        <div
-          id="bottom-nav"
+        <!-- ENTÊTE PHASE + BOUTONS -->
+        <section
+          class="section"
           style="
-            position:sticky;
-            bottom:-16px;
-            left:0;
-            right:0;
-            margin-top:12px;
-            padding-top:8px;
+            margin-top:28px;
+            text-align:center;
+            padding-bottom:8px;
           "
         >
+          <h1 class="login-title" style="margin-bottom:8px;">${phaseLabel}</h1>
+
           <div
+            class="cta-block"
             style="
               display:flex;
-              justify-content:space-around;
-              gap:8px;
-              padding:6px 4px 0 4px;
-              border-top:1px solid rgba(148,163,184,0.3);
+              gap:12px;
+              justify-content:center;
+              margin-top:4px;
             "
           >
-            <button
-              id="tab-village"
-              type="button"
-              style="
-                flex:1;
-                padding:8px 4px;
-                border-radius:999px;
-                border:none;
-                font-size:13px;
-                background:rgba(148,163,184,0.16);
-              "
-            >
-              Vue du village
+            <button class="btn btn-primary" id="btn-vote" style="flex:1;">
+              Vote
             </button>
-            <button
-              id="tab-profile"
-              type="button"
-              style="
-                flex:1;
-                padding:8px 4px;
-                border-radius:999px;
-                border:none;
-                font-size:13px;
-                background:transparent;
-              "
-            >
-              Profil
+            <button class="btn btn-outline" id="btn-action" style="flex:1;">
+              Action
             </button>
           </div>
+        </section>
+
+        <!-- ZONE SCROLLABLE POUR LES JOUEURS -->
+        <div
+          id="village-scroll"
+          style="
+            flex:1;
+            margin-top:12px;
+            padding:12px 4px 4px 4px;
+            border-radius:20px;
+            background:rgba(15,23,42,0.4);
+            overflow-y:auto;
+          "
+        >
+          <!-- VIVANTS -->
+          <section class="section" style="padding-top:0;padding-bottom:8px;">
+            <h2
+              class="section-title"
+              style="
+                font-size:13px;
+                letter-spacing:0.08em;
+                text-transform:uppercase;
+              "
+            >
+              Vivants
+            </h2>
+            <div
+              id="village-alive-grid"
+              style="
+                margin-top:8px;
+                display:grid;
+                grid-template-columns:repeat(5, minmax(0, 1fr));
+                gap:8px 6px;
+              "
+            >
+              <!-- cartes vivants remplies dynamiquement -->
+            </div>
+          </section>
+
+          <hr
+            style="
+              border:none;
+              border-top:1px solid rgba(148,163,184,0.25);
+              margin:4px 0 10px 0;
+            "
+          />
+
+          <!-- MORTS -->
+          <section class="section" style="padding-top:0;">
+            <h2
+              class="section-title"
+              style="
+                font-size:13px;
+                letter-spacing:0.08em;
+                text-transform:uppercase;
+              "
+            >
+              Morts
+            </h2>
+            <div
+              id="village-dead-grid"
+              style="
+                margin-top:8px;
+                display:grid;
+                grid-template-columns:repeat(5, minmax(0, 1fr));
+                gap:8px 6px;
+              "
+            >
+              <!-- cartes morts remplies dynamiquement -->
+            </div>
+            <p
+              id="village-dead-empty"
+              style="
+                margin-top:6px;
+                font-size:12px;
+                color:var(--text-muted);
+              "
+            >
+              Aucun joueur mort pour l’instant.
+            </p>
+          </section>
         </div>
 
+        <!-- NAVIGATION BAS -->
+        <div
+          class="cta-block"
+          style="
+            margin-top:10px;
+            gap:8px;
+            justify-content:space-between;
+          "
+        >
+          <button
+            class="btn btn-primary btn-sm"
+            id="tab-village"
+            style="flex:1;"
+          >
+            Vue du village
+          </button>
+          <button
+            class="btn btn-outline btn-sm"
+            id="tab-profile"
+            style="flex:1;"
+          >
+            Profil
+          </button>
+        </div>
       </div>
     </div>
   `;
 
-  // Paramètres – même logique que dans le lobby
+  /* ==== Paramètres : ouverture / fermeture ==== */
   const panel = document.getElementById("settings-panel");
   const backdrop = document.getElementById("settings-backdrop");
 
@@ -350,33 +325,16 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
   }
 
   document.getElementById("btn-settings")?.addEventListener("click", openSettings);
-  document
-    .getElementById("btn-settings-close")
-    ?.addEventListener("click", closeSettings);
+  document.getElementById("btn-settings-close")?.addEventListener("click", closeSettings);
   backdrop?.addEventListener("click", closeSettings);
 
-  // Déconnexion
+  // Quitter / supprimer depuis les paramètres
   document
-    .getElementById("btn-settings-logout")
-    ?.addEventListener("click", () => {
-      auth
-        .signOut()
-        .catch((err) => {
-          alert("Erreur lors de la déconnexion : " + err.message);
-        })
-        .finally(() => {
-          closeSettings();
-          navigateTo("#/login");
-        });
-    });
-
-  // Supprimer la partie (MJ) depuis paramètres
-  if (isMj) {
-    const btnDelete = document.getElementById("btn-settings-delete-game");
-    if (btnDelete) {
-      btnDelete.addEventListener("click", async () => {
+    .getElementById("btn-settings-leave")
+    ?.addEventListener("click", async () => {
+      if (isMj) {
         const ok = window.confirm(
-          "Supprimer définitivement cette partie (et ses joueurs) ?"
+          "Supprimer définitivement cette partie (et tous les joueurs) ?"
         );
         if (!ok) return;
         try {
@@ -391,23 +349,14 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
           closeSettings();
           navigateTo("#/app/home");
         } catch (err) {
-          console.error("[running] erreur suppression partie :", err);
+          console.error(err);
           alert("Erreur lors de la suppression : " + err.message);
         }
-      });
-    }
-  }
-
-  // Quitter la partie (joueur) depuis paramètres
-  if (!isMj && isCurrentPlayer) {
-    const btnLeave = document.getElementById("btn-settings-leave-game");
-    if (btnLeave) {
-      btnLeave.addEventListener("click", async () => {
+      } else {
         const ok = window.confirm(
           "Quitter définitivement cette partie ? Tu devras demander au MJ pour revenir."
         );
         if (!ok) return;
-
         try {
           await db
             .collection("games")
@@ -424,31 +373,57 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
           closeSettings();
           navigateTo("#/app/home");
         } catch (err) {
-          console.error("[running] erreur quitter partie :", err);
+          console.error(err);
           alert("Erreur lors de la sortie de la partie : " + err.message);
         }
-      });
+      }
+    });
+
+  // Déconnexion
+  document
+    .getElementById("btn-settings-logout")
+    ?.addEventListener("click", () => {
+      auth
+        .signOut()
+        .catch((err) => {
+          alert("Erreur lors de la déconnexion : " + err.message);
+        })
+        .finally(() => {
+          closeSettings();
+          navigateTo("#/login");
+        });
+    });
+
+  /* ==== Navigation bas : onglets ==== */
+  document.getElementById("tab-village")?.addEventListener("click", () => {
+    // déjà sur la vue du village -> rien pour l’instant
+  });
+
+  document.getElementById("tab-profile")?.addEventListener("click", () => {
+    if (typeof renderProfileView === "function") {
+      renderProfileView(gameId, game, isMj, isCurrentPlayer, joinCode);
     }
-  }
+  });
 
-  // Tabs Village / Profil
-  initRunningBottomNav();
-
-  // Boutons Vote / Action (UX seulement pour l'instant)
+  /* ==== Boutons Vote / Action ==== */
   document.getElementById("btn-vote")?.addEventListener("click", () => {
-    alert(
-      "Interface de vote à venir : sélectionne un joueur et envoie un vote pour ce jour / phase."
-    );
+    if (typeof openVoteModal === "function") {
+      openVoteModal(gameId, game, isMj, isCurrentPlayer);
+    } else {
+      alert("Le système de vote sera ajouté dans une prochaine itération.");
+    }
   });
 
   document.getElementById("btn-action")?.addEventListener("click", () => {
-    alert(
-      "Interface d'action de rôle à venir : sélection, double sélection, motion, etc."
-    );
+    if (typeof openActionModal === "function") {
+      openActionModal(gameId, game, isMj, isCurrentPlayer);
+    } else {
+      alert("Le système d’actions de rôle sera ajouté dans une prochaine itération.");
+    }
   });
 
-  // Abonnement temps réel à la liste des joueurs
-  loadRunningPlayers(gameId);
+  // À ce stade, une autre fonction (déjà présente dans ton fichier)
+  // doit remplir #village-alive-grid et #village-dead-grid avec les cartes joueurs.
 }
 
 /**
