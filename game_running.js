@@ -35,8 +35,8 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
       : "Les votes et résolutions du jour seront branchés plus tard.";
 
   app.innerHTML = `
-    <div class="shell">
-      <div class="card">
+    <div class="shell" style="max-width:100%; padding:8px 4px;">
+      <div class="card" style="width:100%; max-width:100%; margin:0 auto;">
         <div class="game-badge">
           <span class="game-badge-dot"></span>
           <span>Partie en cours</span>
@@ -109,6 +109,32 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
           >
             Se déconnecter
           </button>
+
+          ${
+            isMj
+              ? `
+                <button
+                  id="btn-settings-delete-game"
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  style="width:100%;border-color:#f97373;color:#fecaca;"
+                >
+                  Supprimer la partie
+                </button>
+              `
+              : isCurrentPlayer
+              ? `
+                <button
+                  id="btn-settings-leave-game"
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  style="width:100%;border-color:#f97373;color:#fecaca;"
+                >
+                  Quitter la partie
+                </button>
+              `
+              : ""
+          }
         </div>
 
         <div
@@ -124,6 +150,7 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
           "
         ></div>
 
+        <!-- HEADER PHASE / INFO -->
         <section class="section" style="margin-top:16px;text-align:center;">
           <h1 class="login-title">${phaseLabel}</h1>
           <p class="login-description">
@@ -138,68 +165,167 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
           ${
             isMj
               ? `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-                   Vue MJ – tu vois tous les joueurs et pourras plus tard déclencher les phases et les résolutions.
+                   Vue MJ – tu vois tous les joueurs, et tu contrôleras plus tard phases et résolutions.
                  </p>`
               : `<p style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-                   Vue joueur – ton rôle et tes actions apparaîtront ici dans une prochaine version.
+                   Vue joueur – ton rôle, tes actions et ton historique seront affichés ici plus tard.
                  </p>`
           }
         </section>
 
-        <!-- Bloc "Tes infos" pour le joueur courant -->
-        <section class="section">
-          <h2 class="section-title">Ton statut</h2>
-          <div
-            id="current-player-box"
-            class="notice-card"
-            style="margin-bottom:8px;"
-          >
-            <div class="notice-title">
-              ${
-                isMj
-                  ? "Tu es le MJ de cette partie."
-                  : "Ton statut sera détaillé ici."
-              }
+        <!-- INTERFACE PRINCIPALE : VILLAGE / PROFIL -->
+        <section class="section" style="margin-top:8px;">
+          <!-- Onglets top ? Non : navigation en bas, mais on garde un container ici -->
+          <div id="view-village" style="display:block;">
+            <!-- Top bar : Vote / Action -->
+            <div
+              class="village-topbar"
+              style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                gap:8px;
+                margin-bottom:8px;
+              "
+            >
+              <button
+                id="btn-vote"
+                class="btn btn-outline btn-sm"
+                type="button"
+                style="flex:1;"
+              >
+                Vote
+              </button>
+              <button
+                id="btn-action"
+                class="btn btn-outline btn-sm"
+                type="button"
+                style="flex:1;"
+              >
+                Action
+              </button>
             </div>
-            <p class="notice-text" id="current-player-text">
-              ${
-                isMj
-                  ? "Tu contrôleras plus tard les phases, les morts annoncées et la résolution des pouvoirs."
-                  : "Pour l’instant, cet encart sert juste à valider la synchro de la partie en cours."
-              }
-            </p>
+
+            <!-- Grille des joueurs (vivants / morts) -->
+            <div
+              class="players-section"
+              style="display:flex;flex-direction:column;gap:10px;"
+            >
+              <div>
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    margin-bottom:4px;
+                  "
+                >
+                  <h2 class="section-title" style="margin-bottom:0;">Vivants</h2>
+                </div>
+                <div
+                  id="village-grid-alive"
+                  class="village-grid"
+                  style="
+                    display:grid;
+                    grid-template-columns:repeat(5, minmax(0,1fr));
+                    gap:4px;
+                  "
+                >
+                  <!-- cartes vivants -->
+                </div>
+              </div>
+
+              <hr style="border:none;border-top:1px solid rgba(148,163,184,0.4);margin:4px 0;" />
+
+              <div>
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    margin-bottom:4px;
+                  "
+                >
+                  <h2 class="section-title" style="margin-bottom:0;">Morts</h2>
+                </div>
+                <div
+                  id="village-grid-dead"
+                  class="village-grid"
+                  style="
+                    display:grid;
+                    grid-template-columns:repeat(5, minmax(0,1fr));
+                    gap:4px;
+                  "
+                >
+                  <!-- cartes morts -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vue Profil -->
+          <div id="view-profile" style="display:none; margin-top:4px;">
+            <h2 class="section-title">Profil</h2>
+            <div class="notice-card" id="profile-box">
+              <div class="notice-title">Tes informations</div>
+              <p class="notice-text" id="profile-text">
+                Chargement de ton profil joueur...
+              </p>
+            </div>
           </div>
         </section>
 
-        <!-- Liste des joueurs (grille) -->
-        <section class="section">
-          <h2 class="section-title" style="text-align:center;">Joueurs dans la partie</h2>
-          <p class="login-description" style="text-align:center; font-size:13px; margin-bottom:8px;">
-            Vue temps réel. Les joueurs fictifs (bots) sont marqués en conséquence.
-          </p>
-
+        <!-- BOTTOM NAVIGATION -->
+        <div
+          id="bottom-nav"
+          style="
+            position:sticky;
+            bottom:-16px;
+            left:0;
+            right:0;
+            margin-top:12px;
+            padding-top:8px;
+          "
+        >
           <div
-            class="players-box"
             style="
-              max-height:260px;
-              overflow-y:auto;
-              padding:8px;
-              border-radius:18px;
-              background:rgba(15,23,42,0.35);
               display:flex;
-              flex-direction:column;
+              justify-content:space-around;
               gap:8px;
+              padding:6px 4px 0 4px;
+              border-top:1px solid rgba(148,163,184,0.3);
             "
           >
-            <ul id="running-players-list" class="section-list" style="width:100%; margin:0;">
-              <li>
-                <div style="padding:10px 14px; border-radius:16px; background:rgba(15,23,42,0.35); font-size:14px;">
-                  Chargement des joueurs...
-                </div>
-              </li>
-            </ul>
+            <button
+              id="tab-village"
+              type="button"
+              style="
+                flex:1;
+                padding:8px 4px;
+                border-radius:999px;
+                border:none;
+                font-size:13px;
+                background:rgba(148,163,184,0.16);
+              "
+            >
+              Vue du village
+            </button>
+            <button
+              id="tab-profile"
+              type="button"
+              style="
+                flex:1;
+                padding:8px 4px;
+                border-radius:999px;
+                border:none;
+                font-size:13px;
+                background:transparent;
+              "
+            >
+              Profil
+            </button>
           </div>
-        </section>
+        </div>
 
       </div>
     </div>
@@ -229,6 +355,7 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
     ?.addEventListener("click", closeSettings);
   backdrop?.addEventListener("click", closeSettings);
 
+  // Déconnexion
   document
     .getElementById("btn-settings-logout")
     ?.addEventListener("click", () => {
@@ -243,16 +370,132 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
         });
     });
 
+  // Supprimer la partie (MJ) depuis paramètres
+  if (isMj) {
+    const btnDelete = document.getElementById("btn-settings-delete-game");
+    if (btnDelete) {
+      btnDelete.addEventListener("click", async () => {
+        const ok = window.confirm(
+          "Supprimer définitivement cette partie (et ses joueurs) ?"
+        );
+        if (!ok) return;
+        try {
+          await deleteGameAndPlayers(gameId);
+          setCurrentGameId("");
+          if (typeof setUserCurrentGame === "function" && authState.uid) {
+            await setUserCurrentGame(authState.uid, null, null);
+          }
+          if (typeof markLastGameDeleted === "function") {
+            markLastGameDeleted();
+          }
+          closeSettings();
+          navigateTo("#/app/home");
+        } catch (err) {
+          console.error("[running] erreur suppression partie :", err);
+          alert("Erreur lors de la suppression : " + err.message);
+        }
+      });
+    }
+  }
+
+  // Quitter la partie (joueur) depuis paramètres
+  if (!isMj && isCurrentPlayer) {
+    const btnLeave = document.getElementById("btn-settings-leave-game");
+    if (btnLeave) {
+      btnLeave.addEventListener("click", async () => {
+        const ok = window.confirm(
+          "Quitter définitivement cette partie ? Tu devras demander au MJ pour revenir."
+        );
+        if (!ok) return;
+
+        try {
+          await db
+            .collection("games")
+            .doc(gameId)
+            .collection("players")
+            .doc(authState.uid)
+            .delete();
+
+          if (typeof setUserCurrentGame === "function" && authState.uid) {
+            await setUserCurrentGame(authState.uid, null, null);
+          }
+
+          setCurrentGameId("");
+          closeSettings();
+          navigateTo("#/app/home");
+        } catch (err) {
+          console.error("[running] erreur quitter partie :", err);
+          alert("Erreur lors de la sortie de la partie : " + err.message);
+        }
+      });
+    }
+  }
+
+  // Tabs Village / Profil
+  initRunningBottomNav();
+
+  // Boutons Vote / Action (UX seulement pour l'instant)
+  document.getElementById("btn-vote")?.addEventListener("click", () => {
+    alert(
+      "Interface de vote à venir : sélectionne un joueur et envoie un vote pour ce jour / phase."
+    );
+  });
+
+  document.getElementById("btn-action")?.addEventListener("click", () => {
+    alert(
+      "Interface d'action de rôle à venir : sélection, double sélection, motion, etc."
+    );
+  });
+
   // Abonnement temps réel à la liste des joueurs
-  loadRunningPlayers(gameId, isMj);
+  loadRunningPlayers(gameId);
+}
+
+/**
+ * Nav bas : bascule Vue du village / Profil
+ */
+function initRunningBottomNav() {
+  const tabVillage = document.getElementById("tab-village");
+  const tabProfile = document.getElementById("tab-profile");
+  const viewVillage = document.getElementById("view-village");
+  const viewProfile = document.getElementById("view-profile");
+
+  if (!tabVillage || !tabProfile || !viewVillage || !viewProfile) return;
+
+  function selectVillage() {
+    viewVillage.style.display = "block";
+    viewProfile.style.display = "none";
+
+    tabVillage.style.background = "rgba(148,163,184,0.16)";
+    tabProfile.style.background = "transparent";
+  }
+
+  function selectProfile() {
+    viewVillage.style.display = "none";
+    viewProfile.style.display = "block";
+
+    tabVillage.style.background = "transparent";
+    tabProfile.style.background = "rgba(148,163,184,0.16)";
+  }
+
+  tabVillage.addEventListener("click", selectVillage);
+  tabProfile.addEventListener("click", selectProfile);
+
+  // Onglet par défaut
+  selectVillage();
 }
 
 /**
  * Abonnement temps réel sur /games/{id}/players pendant la partie
+ * Affiche la grille 5xN "vivants" en haut, "morts" en bas.
+ * Hypothèse : un joueur est mort si p.state === "dead" (sinon vivant).
  */
-function loadRunningPlayers(gameId, isMj) {
-  const listEl = document.getElementById("running-players-list");
-  if (!listEl) return;
+function loadRunningPlayers(gameId) {
+  const gridAlive = document.getElementById("village-grid-alive");
+  const gridDead = document.getElementById("village-grid-dead");
+  const profileText = document.getElementById("profile-text");
+
+  if (!gridAlive || !gridDead) return;
 
   // Nettoie un éventuel ancien abonnement
   unsubscribeRunningPlayers();
@@ -266,125 +509,179 @@ function loadRunningPlayers(gameId, isMj) {
   runningPlayersUnsub = playersRef.onSnapshot(
     (snap) => {
       if (snap.empty) {
-        listEl.innerHTML = `
-          <li>
-            <div style="padding:10px 14px; border-radius:16px; background:rgba(15,23,42,0.35); font-size:14px;">
-              Aucun joueur trouvé pour cette partie.
-            </div>
-          </li>
+        gridAlive.innerHTML = `
+          <div style="grid-column:1 / -1; padding:10px 8px; border-radius:12px; background:rgba(15,23,42,0.35); font-size:13px; text-align:center;">
+            Aucun joueur trouvé pour cette partie.
+          </div>
         `;
+        gridDead.innerHTML = "";
+        if (profileText) {
+          profileText.textContent =
+            "Impossible de trouver ton profil joueur pour cette partie.";
+        }
         return;
       }
 
-      const rows = [];
+      const aliveCards = [];
+      const deadCards = [];
+      let selfInfo = null;
+
       snap.forEach((doc) => {
         const p = doc.data();
-        const name = p.display_name || p.name || "Joueur";
+        const id = doc.id;
+        const name = (p.display_name || p.name || "Joueur").toString();
         const isBot = !!p.is_bot;
-        const isSelf = doc.id === authState.uid;
-
         const icon = isBot ? "🤖" : "👤";
-        const badgeSelf = isSelf ? `<span style="font-size:11px;color:#38bdf8;">(toi)</span>` : "";
-        const badgeBot = isBot ? `<span style="font-size:11px;color:#a855f7;">bot</span>` : "";
+        const state = p.state || "alive"; // "alive" | "dead"
+        const isDead = state === "dead";
+        const isSelf = id === authState.uid;
 
-        rows.push(`
-          <li data-player-id="${doc.id}">
+        if (isSelf) {
+          selfInfo = { name, isBot, isDead, state };
+        }
+
+        const cardHtml = `
+          <button
+            type="button"
+            class="village-card"
+            data-player-id="${id}"
+            style="
+              position:relative;
+              width:100%;
+              aspect-ratio:5/7;
+              border-radius:10px;
+              border:1px solid rgba(15,23,42,0.8);
+              background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,64,175,0.7));
+              display:flex;
+              flex-direction:column;
+              align-items:center;
+              justify-content:flex-end;
+              padding:4px;
+              overflow:hidden;
+              opacity:${isDead ? 0.4 : 1};
+            "
+          >
+            <!-- Dos de carte (placeholders, images plus tard) -->
             <div
-              class="player-row"
               style="
-                display:flex;
-                align-items:center;
-                justify-content:space-between;
-                gap:8px;
-                padding:8px 10px;
-                border-radius:999px;
-                background:rgba(15,23,42,0.5);
+                position:absolute;
+                inset:0;
+                background:radial-gradient(circle at 20% 20%, rgba(148,163,184,0.25), transparent 55%),
+                            radial-gradient(circle at 80% 80%, rgba(15,23,42,0.9), transparent 60%);
+                pointer-events:none;
+              "
+            ></div>
+
+            <!-- Icône + état -->
+            <div
+              style="
+                position:absolute;
+                top:4px;
+                left:4px;
+                font-size:14px;
+                z-index:2;
               "
             >
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div
-                  style="
-                    width:34px;
-                    height:34px;
-                    border-radius:999px;
-                    background:rgba(15,23,42,0.8);
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    font-size:16px;
-                  "
-                >
-                  ${icon}
-                </div>
-                <div style="display:flex;flex-direction:column;">
-                  <span class="player-name" style="font-size:15px;">
-                    ${name} ${badgeSelf}
-                  </span>
-                  <span style="font-size:11px;color:var(--text-muted);">
-                    ${
-                      isBot
-                        ? "Joueur fictif (pour tests)"
-                        : "Joueur réel"
-                    }
-                    ${badgeBot}
-                  </span>
-                </div>
-              </div>
-              ${
-                isMj && isBot
-                  ? `<button
-                       class="btn btn-outline btn-sm running-remove-bot"
-                       type="button"
-                     >
-                       Retirer
-                     </button>`
-                  : ""
-              }
+              ${icon}
             </div>
-          </li>
-        `);
+
+            <div
+              style="
+                position:absolute;
+                top:4px;
+                right:4px;
+                font-size:11px;
+                padding:2px 6px;
+                border-radius:999px;
+                background:rgba(15,23,42,0.8);
+                color:${isDead ? "#fca5a5" : "#bbf7d0"};
+                z-index:2;
+              "
+            >
+              ${isDead ? "mort" : "vivant"}
+            </div>
+
+            <!-- Nom -->
+            <div
+              style="
+                position:relative;
+                z-index:2;
+                width:100%;
+                text-align:center;
+                margin-top:auto;
+              "
+            >
+              <div
+                style="
+                  font-size:12px;
+                  font-weight:600;
+                  text-shadow:0 1px 2px rgba(0,0,0,0.8);
+                "
+              >
+                ${name}
+              </div>
+            </div>
+          </button>
+        `;
+
+        if (isDead) {
+          deadCards.push(cardHtml);
+        } else {
+          aliveCards.push(cardHtml);
+        }
       });
 
-      listEl.innerHTML = rows.join("");
+      gridAlive.innerHTML =
+        aliveCards.length > 0
+          ? aliveCards.join("")
+          : `
+        <div style="grid-column:1 / -1; padding:8px 6px; border-radius:10px; background:rgba(15,23,42,0.35); font-size:12px; text-align:center;">
+          Aucun joueur vivant pour l’instant.
+        </div>
+      `;
 
-      // Le MJ peut retirer un bot pendant la partie
-      if (isMj) {
-        listEl.querySelectorAll(".running-remove-bot").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const li = btn.closest("li");
-            if (!li) return;
-            const playerId = li.getAttribute("data-player-id");
-            if (!playerId) return;
+      gridDead.innerHTML =
+        deadCards.length > 0
+          ? deadCards.join("")
+          : `
+        <div style="grid-column:1 / -1; padding:8px 6px; border-radius:10px; background:rgba(15,23,42,0.12); font-size:12px; text-align:center;">
+          Aucun joueur mort pour l’instant.
+        </div>
+      `;
 
-            const ok = window.confirm(
-              "Retirer ce joueur fictif de la partie ?"
-            );
-            if (!ok) return;
-
-            try {
-              await db
-                .collection("games")
-                .doc(gameId)
-                .collection("players")
-                .doc(playerId)
-                .delete();
-            } catch (err) {
-              console.error("[running] erreur suppression bot :", err);
-              alert("Erreur lors de la suppression du bot : " + err.message);
-            }
-          });
-        });
+      // Mise à jour du profil simple
+      if (profileText) {
+        if (!selfInfo) {
+          profileText.textContent =
+            "Ton joueur n’a pas été trouvé dans cette partie.";
+        } else {
+          const lignes = [];
+          lignes.push(`Prénom affiché : ${selfInfo.name}`);
+          lignes.push(
+            `Type : ${selfInfo.isBot ? "Joueur fictif (bot)" : "Joueur réel"}`
+          );
+          lignes.push(
+            `Statut : ${selfInfo.isDead ? "mort" : "vivant"}`
+          );
+          lignes.push(
+            "Ton rôle, tes actions et ton historique seront affichés ici dans une prochaine version."
+          );
+          profileText.textContent = lignes.join("\n");
+        }
       }
     },
     (err) => {
       console.error("[running] erreur onSnapshot players :", err);
-      listEl.innerHTML = `
-        <li>
-          <div style="padding:10px 14px; border-radius:16px; background:rgba(127,29,29,0.8); font-size:14px;">
-            Erreur de chargement des joueurs : ${err.message}
-          </div>
-        </li>
+      gridAlive.innerHTML = `
+        <div style="grid-column:1 / -1; padding:10px 8px; border-radius:12px; background:rgba(127,29,29,0.8); font-size:13px; text-align:center;">
+          Erreur de chargement des joueurs : ${err.message}
+        </div>
       `;
+      gridDead.innerHTML = "";
+      if (profileText) {
+        profileText.textContent =
+          "Erreur de chargement des données joueur.";
+      }
     }
   );
 }
