@@ -4,12 +4,12 @@
 console.log("[game_running.js] chargé");
 
 // Abonnement temps réel à la liste des joueurs pendant la partie
-let runningPlayersUnsub = null;
+let villagePlayersUnsub = null;
 
-function unsubscribeRunningPlayers() {
-  if (typeof runningPlayersUnsub === "function") {
-    runningPlayersUnsub();
-    runningPlayersUnsub = null;
+function unsubscribeVillagePlayers() {
+  if (typeof villagePlayersUnsub === "function") {
+    villagePlayersUnsub();
+    villagePlayersUnsub = null;
   }
 }
 
@@ -183,6 +183,7 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
             class="cta-block"
             style="
               display:flex;
+              flex-direction:row;
               gap:12px;
               justify-content:center;
               margin-top:4px;
@@ -230,7 +231,7 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
                 gap:8px 6px;
               "
             >
-              <!-- cartes vivants remplies dynamiquement -->
+              <!-- cartes vivants -->
             </div>
           </section>
 
@@ -263,7 +264,7 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
                 gap:8px 6px;
               "
             >
-              <!-- cartes morts remplies dynamiquement -->
+              <!-- cartes morts -->
             </div>
             <p
               id="village-dead-empty"
@@ -285,6 +286,8 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
             margin-top:10px;
             gap:8px;
             justify-content:space-between;
+            display:flex;
+            flex-direction:row;
           "
         >
           <button
@@ -396,12 +399,14 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
 
   /* ==== Navigation bas : onglets ==== */
   document.getElementById("tab-village")?.addEventListener("click", () => {
-    // déjà sur la vue du village -> rien pour l’instant
+    // déjà sur la vue du village
   });
 
   document.getElementById("tab-profile")?.addEventListener("click", () => {
     if (typeof renderProfileView === "function") {
       renderProfileView(gameId, game, isMj, isCurrentPlayer, joinCode);
+    } else {
+      alert("L’onglet Profil sera branché dans une prochaine itération.");
     }
   });
 
@@ -422,244 +427,182 @@ function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
     }
   });
 
-  // À ce stade, une autre fonction (déjà présente dans ton fichier)
-  // doit remplir #village-alive-grid et #village-dead-grid avec les cartes joueurs.
+  // Abonnement temps réel sur les joueurs pour remplir les grilles
+  subscribeVillagePlayers(gameId, isMj);
 }
 
 /**
- * Nav bas : bascule Vue du village / Profil
- */
-function initRunningBottomNav() {
-  const tabVillage = document.getElementById("tab-village");
-  const tabProfile = document.getElementById("tab-profile");
-  const viewVillage = document.getElementById("view-village");
-  const viewProfile = document.getElementById("view-profile");
-
-  if (!tabVillage || !tabProfile || !viewVillage || !viewProfile) return;
-
-  function selectVillage() {
-    viewVillage.style.display = "block";
-    viewProfile.style.display = "none";
-
-    tabVillage.style.background = "rgba(148,163,184,0.16)";
-    tabProfile.style.background = "transparent";
-  }
-
-  function selectProfile() {
-    viewVillage.style.display = "none";
-    viewProfile.style.display = "block";
-
-    tabVillage.style.background = "transparent";
-    tabProfile.style.background = "rgba(148,163,184,0.16)";
-  }
-
-  tabVillage.addEventListener("click", selectVillage);
-  tabProfile.addEventListener("click", selectProfile);
-
-  // Onglet par défaut
-  selectVillage();
-}
-
-/**
- * Abonnement temps réel sur /games/{id}/players pendant la partie
+ * Abonnement temps réel sur /games/{id}/players pendant la partie.
  * Affiche la grille 5xN "vivants" en haut, "morts" en bas.
- * Hypothèse : un joueur est mort si p.state === "dead" (sinon vivant).
+ * Un joueur est mort si p.is_dead === true (sinon vivant).
  */
-function loadRunningPlayers(gameId) {
-  const gridAlive = document.getElementById("village-grid-alive");
-  const gridDead = document.getElementById("village-grid-dead");
-  const profileText = document.getElementById("profile-text");
+function subscribeVillagePlayers(gameId, isMj) {
+  const aliveGrid = document.getElementById("village-alive-grid");
+  const deadGrid = document.getElementById("village-dead-grid");
+  const deadEmpty = document.getElementById("village-dead-empty");
 
-  if (!gridAlive || !gridDead) return;
+  if (!aliveGrid || !deadGrid) {
+    console.warn("[village] conteneurs non trouvés");
+    return;
+  }
 
   // Nettoie un éventuel ancien abonnement
-  unsubscribeRunningPlayers();
+  unsubscribeVillagePlayers();
 
-  const playersRef = db
+  villagePlayersUnsub = db
     .collection("games")
     .doc(gameId)
     .collection("players")
-    .orderBy("joined_at", "asc");
+    .orderBy("joined_at", "asc")
+    .onSnapshot(
+      (snap) => {
+        if (snap.empty) {
+          aliveGrid.innerHTML = `
+            <div style="
+              grid-column:1/-1;
+              padding:10px 14px;
+              border-radius:16px;
+              background:rgba(15,23,42,0.5);
+              font-size:13px;
+              text-align:center;
+            ">
+              Aucun joueur pour l’instant. Ajoute des joueurs ou des bots.
+            </div>
+          `;
+          deadGrid.innerHTML = "";
+          if (deadEmpty) deadEmpty.style.display = "block";
+          return;
+        }
 
-  runningPlayersUnsub = playersRef.onSnapshot(
-    (snap) => {
-      if (snap.empty) {
-        gridAlive.innerHTML = `
-          <div style="grid-column:1 / -1; padding:10px 8px; border-radius:12px; background:rgba(15,23,42,0.35); font-size:13px; text-align:center;">
-            Aucun joueur trouvé pour cette partie.
+        const alive = [];
+        const dead = [];
+
+        snap.forEach((doc) => {
+          const p = doc.data();
+          const name = (p.display_name || p.name || "Joueur").toString();
+          const isDead = !!p.is_dead;
+          const isBot = !!p.is_bot;
+          const isSelf = doc.id === authState.uid;
+
+          const cardHtml = `
+            <div
+              class="village-card-wrapper"
+              style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                gap:4px;
+              "
+            >
+              <div
+                style="
+                  width:100%;
+                  padding-top:140%;
+                  border-radius:12px;
+                  overflow:hidden;
+                  background:#020617;
+                  box-shadow:0 0 0 1px rgba(15,23,42,0.9);
+                  background-image:url('/assets/cards/back-neutral.png');
+                  background-size:cover;
+                  background-position:center;
+                  opacity:${isDead ? 0.4 : 1};
+                  position:relative;
+                "
+              >
+                ${
+                  isDead
+                    ? `
+                  <div
+                    style="
+                      position:absolute;
+                      top:4px;
+                      right:4px;
+                      font-size:11px;
+                      padding:2px 6px;
+                      border-radius:999px;
+                      background:rgba(15,23,42,0.9);
+                      color:#fca5a5;
+                    "
+                  >
+                    mort
+                  </div>
+                  `
+                    : ""
+                }
+              </div>
+              <div
+                style="
+                  font-size:12px;
+                  font-weight:600;
+                  text-align:center;
+                  color:#e5e7eb;
+                  text-shadow:0 1px 2px rgba(0,0,0,0.9);
+                  line-height:1.2;
+                "
+              >
+                ${name}${isBot ? " (bot)" : isSelf ? " (toi)" : ""}
+              </div>
+            </div>
+          `;
+
+          if (isDead) {
+            dead.push(cardHtml);
+          } else {
+            alive.push(cardHtml);
+          }
+        });
+
+        aliveGrid.innerHTML =
+          alive.length > 0
+            ? alive
+                .map(
+                  (h) => `
+              <div>${h}</div>
+            `
+                )
+                .join("")
+            : `
+          <div style="
+            grid-column:1/-1;
+            padding:8px 6px;
+            border-radius:10px;
+            background:rgba(15,23,42,0.35);
+            font-size:12px;
+            text-align:center;
+          ">
+            Aucun joueur vivant pour l’instant.
           </div>
         `;
-        gridDead.innerHTML = "";
-        if (profileText) {
-          profileText.textContent =
-            "Impossible de trouver ton profil joueur pour cette partie.";
+
+        deadGrid.innerHTML =
+          dead.length > 0
+            ? dead
+                .map(
+                  (h) => `
+              <div>${h}</div>
+            `
+                )
+                .join("")
+            : "";
+
+        if (deadEmpty) {
+          deadEmpty.style.display = dead.length === 0 ? "block" : "none";
         }
-        return;
+      },
+      (err) => {
+        console.error("[village] erreur snapshot joueurs :", err);
+        aliveGrid.innerHTML = `
+          <div style="
+            grid-column:1/-1;
+            padding:10px 14px;
+            border-radius:16px;
+            background:rgba(127,29,29,0.5);
+            font-size:13px;
+            text-align:center;
+          ">
+            Erreur de chargement des joueurs : ${err.message}
+          </div>
+        `;
       }
-
-      const aliveCards = [];
-      const deadCards = [];
-      let selfInfo = null;
-
-      snap.forEach((doc) => {
-        const p = doc.data();
-        const id = doc.id;
-        const name = (p.display_name || p.name || "Joueur").toString();
-        const isBot = !!p.is_bot;
-        const icon = isBot ? "🤖" : "👤";
-        const state = p.state || "alive"; // "alive" | "dead"
-        const isDead = state === "dead";
-        const isSelf = id === authState.uid;
-
-        if (isSelf) {
-          selfInfo = { name, isBot, isDead, state };
-        }
-
-        const cardHtml = `
-  <div
-    class="village-slot"
-    style="
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:2px;
-    "
-  >
-    <button
-      type="button"
-      class="village-card"
-      data-player-id="${id}"
-      style="
-        position:relative;
-        width:100%;
-        aspect-ratio:5/7;
-        border-radius:10px;
-        border:1px solid rgba(15,23,42,0.8);
-        background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,64,175,0.7));
-        display:flex;
-        flex-direction:column;
-        align-items:center;
-        justify-content:flex-end;
-        padding:4px;
-        overflow:hidden;
-        opacity:${isDead ? 0.4 : 1};
-      "
-    >
-<img
-  src="/assets/cards/back-neutral.png"
-  alt="Dos de carte"
-  style="
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    pointer-events:none;
-    border-radius:10px;
-  "
-/>
-
-      <!-- Badge mort uniquement -->
-      ${
-        isDead
-          ? `
-        <div
-          style="
-            position:absolute;
-            top:4px;
-            right:4px;
-            font-size:11px;
-            padding:2px 6px;
-            border-radius:999px;
-            background:rgba(15,23,42,0.9);
-            color:#fca5a5;
-            z-index:2;
-          "
-        >
-          mort
-        </div>
-        `
-          : ""
-      }
-
-      <!-- (pas de prénom dans la carte pour éviter le noir sur noir) -->
-    </button>
-
-    <!-- Prénom sous la carte, bien lisible -->
-    <div
-      class="village-name"
-      style="
-        font-size:13px;
-        font-weight:600;
-        color:#e5e7eb;
-        text-align:center;
-        max-width:100%;
-        word-break:break-word;
-      "
-    >
-      ${name}${isBot ? " (bot)" : isSelf ? " (toi)" : ""}
-    </div>
-  </div>
-`;
-
-        if (isDead) {
-          deadCards.push(cardHtml);
-        } else {
-          aliveCards.push(cardHtml);
-        }
-      });
-
-      gridAlive.innerHTML =
-        aliveCards.length > 0
-          ? aliveCards.join("")
-          : `
-        <div style="grid-column:1 / -1; padding:8px 6px; border-radius:10px; background:rgba(15,23,42,0.35); font-size:12px; text-align:center;">
-          Aucun joueur vivant pour l’instant.
-        </div>
-      `;
-
-      gridDead.innerHTML =
-        deadCards.length > 0
-          ? deadCards.join("")
-          : `
-        <div style="grid-column:1 / -1; padding:8px 6px; border-radius:10px; background:rgba(15,23,42,0.12); font-size:12px; text-align:center;">
-          Aucun joueur mort pour l’instant.
-        </div>
-      `;
-
-      // Mise à jour du profil simple
-      if (profileText) {
-        if (!selfInfo) {
-          profileText.textContent =
-            "Ton joueur n’a pas été trouvé dans cette partie.";
-        } else {
-          const lignes = [];
-          lignes.push(`Prénom affiché : ${selfInfo.name}`);
-          lignes.push(
-            `Type : ${selfInfo.isBot ? "Joueur fictif (bot)" : "Joueur réel"}`
-          );
-          lignes.push(
-            `Statut : ${selfInfo.isDead ? "mort" : "vivant"}`
-          );
-          lignes.push(
-            "Ton rôle, tes actions et ton historique seront affichés ici dans une prochaine version."
-          );
-          profileText.textContent = lignes.join("\n");
-        }
-      }
-    },
-    (err) => {
-      console.error("[running] erreur onSnapshot players :", err);
-      gridAlive.innerHTML = `
-        <div style="grid-column:1 / -1; padding:10px 8px; border-radius:12px; background:rgba(127,29,29,0.8); font-size:13px; text-align:center;">
-          Erreur de chargement des joueurs : ${err.message}
-        </div>
-      `;
-      gridDead.innerHTML = "";
-      if (profileText) {
-        profileText.textContent =
-          "Erreur de chargement des données joueur.";
-      }
-    }
-  );
+    );
 }
