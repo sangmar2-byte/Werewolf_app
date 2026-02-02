@@ -9,9 +9,7 @@ const DEFAULT_MJ_MESSAGE =
 const LG_CURRENT_GAME_KEY = "lg_current_game_id";
 const LG_LAST_GAME_DELETED_KEY = "lg_last_game_deleted";
 
-// Unsub globaux pour les listeners temps réel
-let lobbyPlayersUnsub = null;
-let gameDocUnsub = null;
+let gameDocUnsub = null; // écoute temps réel sur /games/{id}
 
 // --- Helpers stockage local ---
 
@@ -81,51 +79,6 @@ function consumeLastGameDeletedFlag() {
     console.warn("Impossible de lire dans sessionStorage:", e);
     return false;
   }
-}
-
-// --- Petits helpers génériques ---
-
-function shuffleArray(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = a[i];
-    a[i] = a[j];
-    a[j] = tmp;
-  }
-  return a;
-}
-
-// Assignation ultra simple pour le lancement de partie (v1 provisoire)
-function computeAssignments(players) {
-  const shuffled = shuffleArray(players);
-  const nb = shuffled.length;
-
-  const wolvesCount = Math.max(1, Math.round(nb / 4)); // ~25% de loups
-  const occultCount = Math.max(0, Math.round(nb / 6)); // ~16% d'occultes
-
-  const assignments = [];
-
-  shuffled.forEach((p, idx) => {
-    let camp = "village";
-    let role = "villageois";
-    if (idx < wolvesCount) {
-      camp = "wolves";
-      role = "loup_garou";
-    } else if (idx < wolvesCount + occultCount) {
-      camp = "occult";
-      role = "occultiste";
-    }
-    const pseudo = p.display_name || p.name || `Joueur ${idx + 1}`;
-    assignments.push({
-      id: p.id,
-      camp,
-      role,
-      pseudo,
-    });
-  });
-
-  return assignments;
 }
 
 // --- Router pour /app/* ---
@@ -336,6 +289,8 @@ function renderAppHome() {
   document
     .getElementById("btn-settings-logout")
     ?.addEventListener("click", () => {
+      // On NE vide PAS lg_current_game_id ici : au prochain login,
+      // on tentera de revenir dans la même partie.
       auth
         .signOut()
         .catch((err) => {
@@ -539,7 +494,7 @@ async function renderPlayerForm(gameId, gameMeta) {
         </div>
       </div>
     </div>
-  ";
+  `;
 
   document.getElementById("btn-save-player")?.addEventListener("click", () => {
     savePlayerInfoAndGoToLobby(gameId);
@@ -760,7 +715,7 @@ async function createGameFromForm() {
       roles_preset,
       win_conditions_preset,
       mj_message: DEFAULT_MJ_MESSAGE,
-      join_code: null,
+      join_code: null
     };
 
     const docRef = await db.collection("games").add(gameData);
@@ -776,6 +731,59 @@ async function createGameFromForm() {
   } catch (err) {
     console.error(err);
     alert("Erreur lors de la création de la partie : " + err.message);
+  }
+}
+
+// --- Lancer la partie (MJ) ---
+
+async function startGame(gameId) {
+  if (!authState.uid) {
+    alert("Tu dois être connecté.");
+    navigateTo("#/login");
+    return;
+  }
+
+  if (!gameId) {
+    alert("ID de partie manquant.");
+    return;
+  }
+
+  try {
+    const gameRef = db.collection("games").doc(gameId);
+    const snap = await gameRef.get();
+
+    if (!snap.exists) {
+      alert("Partie introuvable.");
+      return;
+    }
+
+    const game = snap.data();
+
+    if (game.mj_uid !== authState.uid) {
+      alert("Seul le MJ peut lancer la partie.");
+      return;
+    }
+
+    if (game.status !== "draft") {
+      alert("La partie est déjà lancée ou terminée.");
+      return;
+    }
+
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+
+    await gameRef.update({
+      status: "running",
+      phase: "night",
+      day_index: 1,
+      started_at: now,
+      updated_at: now,
+    });
+
+    // Le onSnapshot sur /games/{id} (renderGameLobby) se chargera
+    // d'envoyer tout le monde sur renderGameRunning.
+  } catch (err) {
+    console.error("[startGame] erreur :", err);
+    alert("Erreur lors du lancement de la partie : " + err.message);
   }
 }
 
@@ -868,7 +876,6 @@ async function renderGameLobby(gameId) {
 
         // Garde d'accès : si l'utilisateur n'est ni MJ ni joueur
         if (!isMj && !isCurrentPlayer) {
-          // Si la partie est en draft → on l'envoie sur le formulaire joueur
           if (isDraft) {
             console.log(
               "[renderGameLobby] Utilisateur non membre -> formulaire joueur"
@@ -890,7 +897,6 @@ async function renderGameLobby(gameId) {
             return;
           }
 
-          // Sinon (partie en cours ou finie) → retour à l'accueil
           console.log(
             "[renderGameLobby] Utilisateur non membre et partie non draft -> home"
           );
@@ -910,18 +916,19 @@ async function renderGameLobby(gameId) {
         // À partir d'ici : MJ ou joueur officiel → on mémorise la partie courante (local)
         setCurrentGameId(gameId);
 
-        // Selon le status, on affiche soit le lobby (draft), soit la vue “partie en cours”
+        // Affichage selon status
         if (isDraft) {
           renderGameLobbyView(gameId, game, isMj, isCurrentPlayer, joinCode);
-          // Le lobby a besoin de la liste des joueurs (en temps réel)
           loadLobbyPlayers(gameId, isMj);
         } else {
-          // On quitte le lobby : on coupe l'écoute sur la liste des joueurs si elle existe
-          if (typeof lobbyPlayersUnsub === "function") {
-            lobbyPlayersUnsub();
-            lobbyPlayersUnsub = null;
+          // Partie en cours : on délègue à game_running.js
+          if (typeof renderGameRunning === "function") {
+            renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode);
+          } else {
+            console.error(
+              "[renderGameLobby] renderGameRunning non défini. Vérifie que game_running.js est bien chargé."
+            );
           }
-          renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode);
         }
       },
       (err) => {
@@ -1301,352 +1308,110 @@ function renderGameLobbyView(gameId, game, isMj, isCurrentPlayer, joinCode) {
   }
 }
 
-/**
- * Lancer la partie (MJ uniquement)
- * - status: "draft" -> "running"
- * - phase initiale: "night"
- * - day_index: 1
- */
-async function startGame(gameId) {
-  if (!authState.uid) {
-    alert("Tu dois être connecté pour lancer une partie.");
-    navigateTo("#/login");
-    return;
-  }
+// --- Liste des joueurs (lobby) ---
 
-  if (!gameId) {
-    alert("ID de partie manquant.");
-    return;
-  }
-
-  try {
-    const gameRef = db.collection("games").doc(gameId);
-    const gameSnap = await gameRef.get();
-
-    if (!gameSnap.exists) {
-      alert("Partie introuvable.");
-      return;
-    }
-
-    const game = gameSnap.data();
-
-    // Sécurité : seul le MJ peut lancer la partie
-    if (game.mj_uid !== authState.uid) {
-      alert("Seul le MJ de cette partie peut la lancer.");
-      return;
-    }
-
-    // Si elle est déjà lancée, on ne fait rien
-    if (game.status && game.status !== "draft") {
-      alert("Cette partie est déjà lancée ou terminée.");
-      return;
-    }
-
-    // Optionnel : vérifier qu'il y a au moins 1 joueur inscrit
-    const playersSnap = await gameRef.collection("players").get();
-    if (playersSnap.empty) {
-      const ok = window.confirm(
-        "Aucun joueur n'est encore inscrit à cette partie.\n" +
-        "Es-tu sûr de vouloir la lancer maintenant ?"
-      );
-      if (!ok) return;
-    }
-
-    // Mise à jour de l'état de la partie
-    const now = firebase.firestore.FieldValue.serverTimestamp();
-    await gameRef.update({
-      status: "running",
-      phase: "night",
-      day_index: 1,
-      updated_at: now,
-    });
-
-    // Rien d'autre à faire ici : le onSnapshot sur /games/{id}
-    // détectera le changement de status et appellera renderGameRunning(...)
-  } catch (err) {
-    console.error("[startGame] erreur :", err);
-    alert("Erreur lors du lancement de la partie : " + err.message);
-  }
-}
-
-function renderGameRunning(gameId, game, isMj, isCurrentPlayer, joinCode) {
-  const app = document.getElementById("app");
-
-  const phase = game.phase || "night";
-  const dayIndex = game.day_index || 1;
-
-  app.innerHTML = `
-    <div class="shell">
-      <div class="card">
-        <div class="game-badge">
-          <span class="game-badge-dot"></span>
-          <span>Partie en cours</span>
-        </div>
-
-        <!-- Bouton paramètres -->
-        <button
-          id="btn-settings"
-          type="button"
-          style="
-            position:absolute;
-            top:16px;
-            right:18px;
-            width:32px;
-            height:32px;
-            border-radius:999px;
-            border:1px solid rgba(148,163,184,0.5);
-            background:rgba(15,23,42,0.9);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:16px;
-          "
-        >
-          ⚙️
-        </button>
-
-        <!-- Panneau latéral paramètres -->
-        <div
-          id="settings-panel"
-          style="
-            position:fixed;
-            top:0;
-            right:0;
-            height:100%;
-            width:70%;
-            max-width:320px;
-            background:rgba(15,23,42,0.98);
-            box-shadow:-4px 0 16px rgba(0,0,0,0.5);
-            transform:translateX(100%);
-            transition:transform 0.2s ease-out;
-            z-index:40;
-            padding:16px;
-            display:flex;
-            flex-direction:column;
-            gap:12px;
-          "
-        >
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="font-weight:600;font-size:15px;">Paramètres</span>
-            <button
-              id="btn-settings-close"
-              type="button"
-              style="
-                border:none;
-                background:transparent;
-                font-size:20px;
-                line-height:1;
-              "
-            >
-              ✕
-            </button>
-          </div>
-
-          <button
-            id="btn-settings-logout"
-            type="button"
-            class="btn btn-outline btn-sm"
-            style="width:100%;"
-          >
-            Se déconnecter
-          </button>
-        </div>
-
-        <div
-          id="settings-backdrop"
-          style="
-            position:fixed;
-            inset:0;
-            background:rgba(15,23,42,0.6);
-            opacity:0;
-            pointer-events:none;
-            transition:opacity 0.2s ease-out;
-            z-index:30;
-          "
-        ></div>
-
-        <section class="section" style="margin-top:16px;text-align:center;">
-          <h1 class="login-title">La partie a commencé</h1>
-          <p class="login-description">
-            ${
-              phase === "night"
-                ? `Nuit ${dayIndex} en cours. Les actions de nuit seront gérées dans la prochaine étape du développement.`
-                : `Jour ${dayIndex} en cours. Le système de votes et d’actions sera branché plus tard.`
-            }
-          </p>
-
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-            ID de la partie :
-            <code style="font-size:11px;">${joinCode}</code>
-          </p>
-        </section>
-
-        <section class="section">
-          <div class="notice-card">
-            <div class="notice-title">Écran provisoire</div>
-            <p class="notice-text">
-              Cette vue sera remplacée par la grille des joueurs, le système de vote
-              et les actions de rôle (Épic 3 & 4). Pour l’instant, elle sert à
-              vérifier que tous les joueurs sortent bien du lobby quand la partie
-              passe en <strong>running</strong>.
-            </p>
-          </div>
-        </section>
-      </div>
-    </div>
-  `;
-
-  // Paramètres
-  const panel = document.getElementById("settings-panel");
-  const backdrop = document.getElementById("settings-backdrop");
-
-  function openSettings() {
-    if (!panel || !backdrop) return;
-    panel.style.transform = "translateX(0)";
-    backdrop.style.opacity = "1";
-    backdrop.style.pointerEvents = "auto";
-  }
-
-  function closeSettings() {
-    if (!panel || !backdrop) return;
-    panel.style.transform = "translateX(100%)";
-    backdrop.style.opacity = "0";
-    backdrop.style.pointerEvents = "none";
-  }
-
-  document.getElementById("btn-settings")?.addEventListener("click", openSettings);
-  document
-    .getElementById("btn-settings-close")
-    ?.addEventListener("click", closeSettings);
-  backdrop?.addEventListener("click", closeSettings);
-
-  document
-    .getElementById("btn-settings-logout")
-    ?.addEventListener("click", () => {
-      auth
-        .signOut()
-        .catch((err) => {
-          alert("Erreur lors de la déconnexion : " + err.message);
-        })
-        .finally(() => {
-          closeSettings();
-          navigateTo("#/login");
-        });
-    });
-}
-
-// --- Liste des joueurs en temps réel ---
-
-function loadLobbyPlayers(gameId, isMj) {
+async function loadLobbyPlayers(gameId, isMj) {
   const listEl = document.getElementById("players-list");
   if (!listEl) return;
 
-  // On coupe l'ancien listener si besoin
-  if (typeof lobbyPlayersUnsub === "function") {
-    lobbyPlayersUnsub();
-    lobbyPlayersUnsub = null;
-  }
+  try {
+    const snap = await db
+      .collection("games")
+      .doc(gameId)
+      .collection("players")
+      .orderBy("joined_at", "asc")
+      .get();
 
-  const playersRef = db
-    .collection("games")
-    .doc(gameId)
-    .collection("players")
-    .orderBy("joined_at", "asc");
-
-  lobbyPlayersUnsub = playersRef.onSnapshot(
-    (snap) => {
-      if (snap.empty) {
-        listEl.innerHTML = `
-          <li>
-            <div style="padding:10px 14px; border-radius:16px; background:rgba(15,23,42,0.35); font-size:14px;">
-              Aucun joueur pour l’instant. Partage l’ID de la partie.
-            </div>
-          </li>
-        `;
-        return;
-      }
-
-      const rows = [];
-      snap.forEach((doc) => {
-        const p = doc.data();
-        const name = p.display_name || p.name || "Joueur";
-
-        rows.push(`
-          <li data-player-id="${doc.id}">
-            <div
-              class="player-row"
-              style="
-                display:flex;
-                align-items:center;
-                justify-content:space-between;
-                gap:8px;
-                padding:8px 10px;
-                border-radius:999px;
-                background:rgba(15,23,42,0.5);
-              "
-            >
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div
-                  style="
-                    width:34px;
-                    height:34px;
-                    border-radius:999px;
-                    background:rgba(15,23,42,0.8);
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    font-size:16px;
-                  "
-                >
-                  👤
-                </div>
-                <div class="player-name" style="font-size:15px;">
-                  ${name}
-                </div>
-              </div>
-              ${
-                isMj
-                  ? `<button
-                       class="btn btn-outline btn-sm player-rename"
-                       type="button"
-                     >
-                       Renommer
-                     </button>`
-                  : ""
-              }
-            </div>
-          </li>
-        `);
-      });
-
-      listEl.innerHTML = rows.join("");
-
-      if (isMj) {
-        listEl.querySelectorAll(".player-rename").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const li = btn.closest("li");
-            if (!li) return;
-            const playerId = li.getAttribute("data-player-id");
-            const nameEl = li.querySelector(".player-name");
-            const currentName = nameEl?.textContent?.trim() || "";
-            if (!playerId) return;
-            renamePlayer(gameId, playerId, currentName);
-          });
-        });
-      }
-    },
-    (err) => {
-      console.error(err);
+    if (snap.empty) {
       listEl.innerHTML = `
         <li>
-          <span class="section-bullet"></span>
-          <span style="color:var(--danger);">
-            Erreur de chargement des joueurs : ${err.message}
-          </span>
+          <div style="padding:10px 14px; border-radius:16px; background:rgba(15,23,42,0.35); font-size:14px;">
+            Aucun joueur pour l’instant. Partage l’ID de la partie.
+          </div>
         </li>
       `;
+      return;
     }
-  );
+
+    const rows = [];
+    snap.forEach((doc) => {
+      const p = doc.data();
+      const name = p.display_name || p.name || "Joueur";
+
+      rows.push(`
+        <li data-player-id="${doc.id}">
+          <div
+            class="player-row"
+            style="
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:8px;
+              padding:8px 10px;
+              border-radius:999px;
+              background:rgba(15,23,42,0.5);
+            "
+          >
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div
+                style="
+                  width:34px;
+                  height:34px;
+                  border-radius:999px;
+                  background:rgba(15,23,42,0.8);
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  font-size:16px;
+                "
+              >
+                👤
+              </div>
+              <div class="player-name" style="font-size:15px;">
+                ${name}
+              </div>
+            </div>
+            ${
+              isMj
+                ? `<button
+                     class="btn btn-outline btn-sm player-rename"
+                     type="button"
+                   >
+                     Renommer
+                   </button>`
+                : ""
+            }
+          </div>
+        </li>
+      `);
+    });
+
+    listEl.innerHTML = rows.join("");
+
+    if (isMj) {
+      listEl.querySelectorAll(".player-rename").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const li = btn.closest("li");
+          if (!li) return;
+          const playerId = li.getAttribute("data-player-id");
+          const nameEl = li.querySelector(".player-name");
+          const currentName = nameEl?.textContent?.trim() || "";
+          if (!playerId) return;
+          renamePlayer(gameId, playerId, currentName);
+        });
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    listEl.innerHTML = `
+      <li>
+        <span class="section-bullet"></span>
+        <span style="color:var(--danger);">
+          Erreur de chargement des joueurs : ${err.message}
+        </span>
+      </li>
+    `;
+  }
 }
 
 /**
@@ -1671,7 +1436,8 @@ async function renamePlayer(gameId, playerId, currentName) {
         display_name: trimmed,
         updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       });
-    // Pas besoin de recharger manuellement : onSnapshot fera le travail.
+
+    loadLobbyPlayers(gameId, true);
   } catch (err) {
     console.error(err);
     alert("Erreur lors du renommage du joueur : " + err.message);
@@ -1741,90 +1507,4 @@ async function deleteGameAndPlayers(gameId) {
   batch.delete(gameRef);
 
   await batch.commit();
-}
-
-/**
- * Lancement de la partie : assignation camps/rôles très simple + status=running
- */
-async function startGame(gameId) {
-  if (!authState.uid) {
-    alert("Tu dois être connecté.");
-    navigateTo("#/login");
-    return;
-  }
-
-  const gameRef = db.collection("games").doc(gameId);
-  const playersRef = gameRef.collection("players");
-
-  try {
-    const gameSnap = await gameRef.get();
-    if (!gameSnap.exists) {
-      alert("Partie introuvable.");
-      return;
-    }
-
-    const game = gameSnap.data();
-
-    if (game.mj_uid !== authState.uid) {
-      alert("Seul le MJ peut lancer la partie.");
-      return;
-    }
-
-    if (game.status !== "draft") {
-      alert("La partie n'est plus en phase de préparation.");
-      return;
-    }
-
-    const playersSnap = await playersRef.get();
-    const players = [];
-    playersSnap.forEach((doc) => {
-      players.push({ id: doc.id, ...doc.data() });
-    });
-
-    const nb = players.length;
-    if (nb < 5) {
-      alert("Il faut au moins 5 joueurs pour lancer la partie.");
-      return;
-    }
-
-    const assignments = computeAssignments(players);
-    const batch = db.batch();
-    const now = firebase.firestore.FieldValue.serverTimestamp();
-
-    assignments.forEach((p) => {
-      const ref = playersRef.doc(p.id);
-      batch.update(ref, {
-        camp: p.camp,
-        role: p.role,
-        pseudo: p.pseudo,
-        assigned_at: now,
-      });
-
-      const userRef = db.collection("users").doc(p.id);
-      batch.set(
-        userRef,
-        {
-          current_game_id: gameId,
-          current_game_role: p.role || null,
-          last_update_at: now,
-        },
-        { merge: true }
-      );
-    });
-
-    batch.update(gameRef, {
-      status: "running",
-      updated_at: now,
-      phase: "night",
-      day_index: 1,
-    });
-
-    await batch.commit();
-
-    alert("La partie est lancée !");
-    // Le listener onSnapshot sur le game doc basculera automatiquement sur renderGameRunning
-  } catch (err) {
-    console.error("Erreur startGame:", err);
-    alert("Erreur lors du lancement de la partie : " + err.message);
-  }
 }
