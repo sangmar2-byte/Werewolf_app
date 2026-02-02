@@ -1,5 +1,17 @@
 // app.js
 
+// ==== Handlers d'erreurs globales (debug page blanche) ====
+window.addEventListener("error", (event) => {
+  console.error("[GLOBAL ERROR]", event.message, event.filename, event.lineno, event.colno, event.error);
+  // Aide debug sur téléphone quand la console n'est pas visible
+  alert("Erreur JS : " + event.message);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("[UNHANDLED REJECTION]", event.reason);
+  alert("Erreur asynchrone : " + (event.reason && event.reason.message ? event.reason.message : event.reason));
+});
+
 // Vérifie si le stockage local est disponible (important pour Firebase Auth web)
 function storageAvailable() {
   try {
@@ -64,6 +76,15 @@ auth
 
     if (result.user) {
       console.log("[getRedirectResult] user connecté:", result.user.uid);
+
+      // FIX : si on revient sans hash (#), on force une route connue
+      if (!window.location.hash || window.location.hash === "#") {
+        const base = window.location.origin + window.location.pathname;
+        console.log("[getRedirectResult] hash manquant, redirection vers #/login");
+        window.location.replace(base + "#/login");
+        return;
+      }
+
       // onAuthStateChanged prendra le relais pour la navigation
       return;
     }
@@ -132,7 +153,13 @@ function navigateTo(hash, options = {}) {
  * Ici : seulement les routes publiques + garde pour /app/*
  */
 function router() {
-  const hash = window.location.hash || "#/";
+  let hash = window.location.hash;
+  // FIX : sécuriser les cas où le hash est vide ou juste "#"
+  if (!hash || hash === "#") {
+    hash = "#/";
+  }
+
+  console.log("[router] hash =", hash);
 
   // Garde : toute route /app/* nécessite l’auth
   if (hash.startsWith("#/app/")) {
@@ -182,7 +209,13 @@ function router() {
  * Render: Landing publique
  */
 function renderLanding() {
+  console.log("[renderLanding]");
   const app = document.getElementById("app");
+  if (!app) {
+    console.error("[renderLanding] #app introuvable");
+    return;
+  }
+
   app.innerHTML = `
     <div class="shell">
       <div class="card">
@@ -285,7 +318,13 @@ function renderLanding() {
  * Render: Page de login (email magique + Google)
  */
 function renderLogin() {
+  console.log("[renderLogin]");
   const app = document.getElementById("app");
+  if (!app) {
+    console.error("[renderLogin] #app introuvable");
+    return;
+  }
+
   app.innerHTML = `
     <div class="shell">
       <div class="card">
@@ -340,7 +379,13 @@ function renderLogin() {
  * Render: Règles & confidentialité
  */
 function renderRules() {
+  console.log("[renderRules]");
   const app = document.getElementById("app");
+  if (!app) {
+    console.error("[renderRules] #app introuvable");
+    return;
+  }
+
   app.innerHTML = `
     <div class="shell">
       <div class="card">
@@ -435,10 +480,12 @@ function signInWithGoogle() {
 
   if (isMobile) {
     console.log("[Google] signInWithRedirect");
-    auth.signInWithRedirect(provider).catch((err) => {
-      console.error("Erreur Google redirect:", err);
-      alert("Erreur Google : " + err.message);
-    });
+    auth
+      .signInWithRedirect(provider)
+      .catch((err) => {
+        console.error("Erreur Google redirect:", err);
+        alert("Erreur Google : " + err.message);
+      });
   } else {
     console.log("[Google] signInWithPopup");
     auth
@@ -509,7 +556,10 @@ async function handleEmailLinkSignInIfNeeded() {
       }
     }
 
-    const result = await auth.signInWithEmailLink(email, window.location.href);
+    const result = await auth.signInWithEmailLink(
+      email,
+      window.location.href
+    );
     console.log("[magic-link] connexion OK:", result.user.uid);
     clearRememberedMagicLinkEmail();
 
@@ -529,9 +579,12 @@ auth.onAuthStateChanged(async (user) => {
   authState.isAuthenticated = !!user;
   authState.uid = user ? user.uid : null;
 
-  const hash = window.location.hash || "#/";
+  let hash = window.location.hash;
+  if (!hash || hash === "#") {
+    hash = "#/";
+  }
 
-  console.log("[onAuthStateChanged] user:", !!user, user && user.uid);
+  console.log("[onAuthStateChanged] user:", !!user, user && user.uid, "hash:", hash);
 
   // Utilisateur déconnecté
   if (!authState.isAuthenticated) {
@@ -558,8 +611,10 @@ auth.onAuthStateChanged(async (user) => {
         if (!hash.startsWith("#/app/game/")) {
           navigateTo(`#/app/game/${currentGameId}`, { replace: true });
         } else {
-          // On met juste à jour le cache local
-          setCurrentGameId(currentGameId);
+          // On met juste à jour le cache local, si la fonction existe
+          if (typeof setCurrentGameId === "function") {
+            setCurrentGameId(currentGameId);
+          }
         }
         return;
       } else {
@@ -577,7 +632,9 @@ auth.onAuthStateChanged(async (user) => {
             { merge: true }
           );
 
-        setCurrentGameId("");
+        if (typeof setCurrentGameId === "function") {
+          setCurrentGameId("");
+        }
         if (typeof markLastGameDeleted === "function") {
           markLastGameDeleted();
         }
@@ -598,17 +655,20 @@ auth.onAuthStateChanged(async (user) => {
 // Initialisation générale
 window.addEventListener("hashchange", router);
 window.addEventListener("load", async () => {
-  // Service worker désactivé pendant le développement pour éviter les problèmes de cache.
-  // if ("serviceWorker" in navigator) {
-  //   navigator.serviceWorker
-  //     .register("./service-worker.js")
-  //     .catch((err) => {
-  //       console.warn("Service worker registration failed:", err);
-  //     });
-  // }
+  console.log("[load] start, href:", window.location.href);
 
-  // Si on arrive via un lien magique email, on le traite avant de router
-  await handleEmailLinkSignInIfNeeded();
+  // 1. Si on arrive via un lien magique email, on le traite d'abord
+  try {
+    if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
+      console.log("[load] lien magique détecté");
+      await handleEmailLinkSignInIfNeeded();
+    } else {
+      console.log("[load] pas de lien magique");
+    }
+  } catch (e) {
+    console.error("[load] erreur check email link:", e);
+  }
 
+  // 2. Puis on route
   router();
 });
