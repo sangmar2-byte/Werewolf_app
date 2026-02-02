@@ -541,88 +541,101 @@ function loadRunningPlayers(gameId) {
         }
 
         const cardHtml = `
-          <button
-            type="button"
-            class="village-card"
-            data-player-id="${id}"
-            style="
-              position:relative;
-              width:100%;
-              aspect-ratio:5/7;
-              border-radius:10px;
-              border:1px solid rgba(15,23,42,0.8);
-              background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,64,175,0.7));
-              display:flex;
-              flex-direction:column;
-              align-items:center;
-              justify-content:flex-end;
-              padding:4px;
-              overflow:hidden;
-              opacity:${isDead ? 0.4 : 1};
-            "
-          >
-            <!-- Dos de carte (placeholders, images plus tard) -->
-            <div
-              style="
-                position:absolute;
-                inset:0;
-                background:radial-gradient(circle at 20% 20%, rgba(148,163,184,0.25), transparent 55%),
-                            radial-gradient(circle at 80% 80%, rgba(15,23,42,0.9), transparent 60%);
-                pointer-events:none;
-              "
-            ></div>
+  <div
+    class="village-slot"
+    style="
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:2px;
+    "
+  >
+    <button
+      type="button"
+      class="village-card"
+      data-player-id="${id}"
+      style="
+        position:relative;
+        width:100%;
+        aspect-ratio:5/7;
+        border-radius:10px;
+        border:1px solid rgba(15,23,42,0.8);
+        background:linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,64,175,0.7));
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:flex-end;
+        padding:4px;
+        overflow:hidden;
+        opacity:${isDead ? 0.4 : 1};
+      "
+    >
+      <!-- Dos de carte (placeholder, on remplacera par une image réelle) -->
+      <div
+        style="
+          position:absolute;
+          inset:0;
+          background:radial-gradient(circle at 20% 20%, rgba(148,163,184,0.25), transparent 55%),
+                      radial-gradient(circle at 80% 80%, rgba(15,23,42,0.9), transparent 60%);
+          pointer-events:none;
+        "
+      ></div>
 
-            <!-- Icône + état -->
-            <div
-              style="
-                position:absolute;
-                top:4px;
-                left:4px;
-                font-size:14px;
-                z-index:2;
-              "
-            >
-              ${icon}
-            </div>
+      <!-- Icône joueur / bot -->
+      <div
+        style="
+          position:absolute;
+          top:4px;
+          left:4px;
+          font-size:14px;
+          z-index:2;
+        "
+      >
+        ${icon}
+      </div>
 
-            <div
-              style="
-                position:absolute;
-                top:4px;
-                right:4px;
-                font-size:11px;
-                padding:2px 6px;
-                border-radius:999px;
-                background:rgba(15,23,42,0.8);
-                color:${isDead ? "#fca5a5" : "#bbf7d0"};
-                z-index:2;
-              "
-            >
-              ${isDead ? "mort" : "vivant"}
-            </div>
+      <!-- Badge mort uniquement -->
+      ${
+        isDead
+          ? `
+        <div
+          style="
+            position:absolute;
+            top:4px;
+            right:4px;
+            font-size:11px;
+            padding:2px 6px;
+            border-radius:999px;
+            background:rgba(15,23,42,0.9);
+            color:#fca5a5;
+            z-index:2;
+          "
+        >
+          mort
+        </div>
+        `
+          : ""
+      }
 
-            <!-- Nom -->
-            <div
-              style="
-                position:relative;
-                z-index:2;
-                width:100%;
-                text-align:center;
-                margin-top:auto;
-              "
-            >
-              <div
-                style="
-                  font-size:12px;
-                  font-weight:600;
-                  text-shadow:0 1px 2px rgba(0,0,0,0.8);
-                "
-              >
-                ${name}
-              </div>
-            </div>
-          </button>
-        `;
+      <!-- (pas de prénom dans la carte pour éviter le noir sur noir) -->
+    </button>
+
+    <!-- Prénom sous la carte, bien lisible -->
+    <div
+      class="village-name"
+      style="
+        font-size:13px;
+        font-weight:600;
+        color:#e5e7eb;
+        text-align:center;
+        max-width:100%;
+        word-break:break-word;
+      "
+    >
+      ${name}${isBot ? " (bot)" : isSelf ? " (toi)" : ""}
+    </div>
+  </div>
+`;
 
         if (isDead) {
           deadCards.push(cardHtml);
