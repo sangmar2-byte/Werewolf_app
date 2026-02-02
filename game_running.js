@@ -570,16 +570,19 @@ function loadRunningPlayers(gameId) {
         opacity:${isDead ? 0.4 : 1};
       "
     >
-      <!-- Dos de carte (placeholder, on remplacera par une image réelle) -->
-      <div
-        style="
-          position:absolute;
-          inset:0;
-          background:radial-gradient(circle at 20% 20%, rgba(148,163,184,0.25), transparent 55%),
-                      radial-gradient(circle at 80% 80%, rgba(15,23,42,0.9), transparent 60%);
-          pointer-events:none;
-        "
-      >
+<img
+  src="/assets/cards/back-neutral.png"
+  alt="Dos de carte"
+  style="
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    pointer-events:none;
+    border-radius:10px;
+  "
+/>
 
       <!-- Badge mort uniquement -->
       ${
